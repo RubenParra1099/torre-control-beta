@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="description" content="Propuesta de sistema de indicadores de control y toma de decisiones para Servicio Integral BETA: módulos de captura, KPIs, tableros y mapas.">
 <meta property="og:title" content="Torre de Control BETA">
-<meta property="og:description" content="Sistema de indicadores y toma de decisiones para última milla.">
 <script>try{var t=localStorage.getItem('beta-theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Torre de Control BETA</title>
@@ -180,6 +179,10 @@ tr:last-child td{border-bottom:0}
 .filters{display:flex;flex-wrap:wrap;gap:10px}
 .filters label{display:grid;gap:3px;font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
 select{font:inherit;font-size:13.5px;padding:7px 10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;min-width:140px}
+.scope{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--teal);padding:9px 14px;margin-bottom:12px;font-size:13.5px}
+.scope.on{border-left-color:var(--accent);background:var(--accent-soft)}
+.scope b{font-family:var(--display);font-size:16px;font-stretch:90%}
+.scope button{margin-left:auto;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;padding:4px 12px;font-size:12.5px;cursor:pointer}
 .tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:12px}
 .tile{background:var(--surface);border:1px solid var(--line);padding:12px 12px 8px;display:grid;gap:2px;min-width:0}
 .tile.hl{border-color:var(--fg);border-width:1.5px}
@@ -457,10 +460,12 @@ footer a{color:var(--teal)}
         <label for="fPer">Periodo<select id="fPer"><option value="1">Hoy</option><option value="7" selected>Últimos 7 días</option><option value="30">Últimos 30 días</option></select></label>
         <label for="fReg">Región<select id="fReg"><option value="all">Nacional</option><option value="N">Norte</option><option value="C">Centro-Bajío</option><option value="S">Sur-Sureste</option></select></label>
         <label for="fSeg">Segmento<select id="fSeg"><option value="all">Todos</option><option value="sup">Supermercado</option><option value="eco">E-commerce</option><option value="cc">Centro comercial</option></select></label>
+        <label for="fEst">Estado<select id="fEst"></select></label>
         <label for="fVeh">Vehículo<select id="fVeh"><option value="all">Todos</option><option value="moto">Moto</option><option value="sedan">Sedán</option><option value="svan">Small van</option><option value="lvan">Large van</option></select></label>
       </div>
     </div>
 
+    <div class="scope" id="scope" aria-live="polite"></div>
     <div class="tiles" id="tiles"></div>
 
     <div class="pulse">
@@ -523,7 +528,7 @@ footer a{color:var(--teal)}
     <div class="grid2">
       <div class="panel">
         <div class="panel-h">
-          <div><h3>Mapa de calor urbano · Valle de México</h3><span class="sub">Celdas hexagonales H3 resolución 8 (aprox. 0.7 km²)</span></div>
+          <div><h3 id="hexTitle">Mapa de calor urbano · Valle de México</h3><span class="sub">Celdas hexagonales H3 resolución 8 (aprox. 0.7 km²)</span></div>
           <div class="toggle" id="hexT" role="group" aria-label="Capa del mapa urbano"></div>
         </div>
         <div class="chart"><svg id="hexmap" viewBox="0 0 640 330" role="img" aria-label="Mapa de calor hexagonal"></svg></div>
@@ -751,6 +756,8 @@ function adj(){const v=state.veh==='all'?{share:1,cpe:0,otif:0,kpe:3.8}:{share:V
   const s=state.seg==='all'?{share:1,otif:0,fa:0,cpe:0}:SEG[state.seg];return{share:v.share*s.share,cpe:v.cpe+s.cpe,otif:v.otif+s.otif,fa:v.otif+s.fa,kpe:v.kpe}}
 function rows(){const a=adj();return Object.keys(ST).filter(k=>state.reg==='all'||regionOf(k)===state.reg).map(k=>{const s=ST[k];const otif=Math.min(99.5,s.otif+a.otif), fa=Math.min(99,s.fa+a.fa);
   return{k,n:MAP.states[k].n,vol:s.vol*a.share,otif,fa,cpe:s.cpe+a.cpe,inc:s.inc,csat:s.csat,perf:otif*fa/100*(1-s.inc/1000)*0.974}})}
+const scope=()=>{const rs=rows();return state.sel?rs.filter(r=>r.k===state.sel):rs};
+const sseed=()=>state.sel?[...state.sel].reduce((a,c)=>a*31+c.charCodeAt(0),7)%9973:0;
 function agg(rs){const v=rs.reduce((a,r)=>a+r.vol,0),w=f=>rs.reduce((a,r)=>a+r[f]*r.vol,0)/v;return{vol:v,otif:w('otif'),fa:w('fa'),cpe:w('cpe'),inc:w('inc'),csat:w('csat'),perf:w('perf')}}
 
 /* ---------- Tiles ---------- */
@@ -758,21 +765,21 @@ function spark(seed,up){const r=rng(seed);let y=50;const pts=Array.from({length:
   const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+(p[1]*.3).toFixed(1)).join(''),l=pts[19];
   return `<svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L100,30L0,30Z" fill="var(--teal-soft)"/><path d="${d}" fill="none" stroke="var(--teal)" stroke-width="1.4" vector-effect="non-scaling-stroke"/><circle cx="${l[0]}" cy="${(l[1]*.3).toFixed(1)}" r="1.8" fill="var(--teal)"/></svg>`}
 function drawTiles(){
-  const a=agg(rows()),per=state.per;
+  const a=agg(scope()),per=state.per,q=rng(90+sseed()),d1=state.sel?(q()-.35)*9:4.1,d2=state.sel?(q()-.5)*.2:.04;
   const T=[
-    ['Entregas',fmt(Math.round(a.vol*per)),per===1?'hoy':'en '+per+' días','+4.1% vs periodo ant.','up',1,0],
+    ['Entregas',fmt(Math.round(a.vol*per)),per===1?'hoy':'en '+per+' días',(d1>=0?'+':'−')+fmt(Math.abs(d1),1)+'% vs periodo ant.',d1>=0?'up':'down',1,0],
     ['Entrega perfecta',fmt(a.perf,1)+'%','meta 82.8%',(a.perf>=82.8?'+':'−')+fmt(Math.abs(a.perf-82.8),1)+' pts vs meta',a.perf>=82.8?'up':'down',7,1],
     ['OTIF',fmt(a.otif,1)+'%','meta 95%',(a.otif>=95?'+':'−')+fmt(Math.abs(a.otif-95),1)+' pts vs meta',a.otif>=95?'up':'down',2,0],
     ['Primer intento',fmt(a.fa,1)+'%','meta 90%',(a.fa>=90?'+':'−')+fmt(Math.abs(a.fa-90),1)+' pts vs meta',a.fa>=90?'up':'down',3,0],
     ['Costo por entrega','$'+fmt(a.cpe,1),'tarifa prom. $'+TARIFA,fmt(a.cpe/TARIFA*100,0)+'% de la tarifa',a.cpe/TARIFA<=.7?'up':'down',4,0],
-    ['CSAT destinatario',fmt(a.csat,2),'escala 1–5','+0.04 vs periodo ant.','up',6,0]
+    ['CSAT destinatario',fmt(a.csat,2),'escala 1–5',(d2>=0?'+':'−')+fmt(Math.abs(d2),2)+' vs periodo ant.',d2>=0?'up':'down',6,0]
   ];
-  $('#tiles').innerHTML=T.map(t=>`<div class="tile${t[6]?' hl':''}"><span class="k"><span>${t[0]}</span>${t[6]?'<span style="font-family:var(--mono);font-size:10px;color:var(--accent)">RECTOR</span>':''}</span><span class="v">${t[1]}</span><span class="d flat">${t[2]}</span><span class="d ${t[4]}">${t[3]}</span>${spark(t[5]*7+per,t[4]==='up')}</div>`).join('');
+  $('#tiles').innerHTML=T.map(t=>`<div class="tile${t[6]?' hl':''}"><span class="k"><span>${t[0]}</span>${t[6]?'<span style="font-family:var(--mono);font-size:10px;color:var(--accent)">RECTOR</span>':''}</span><span class="v">${t[1]}</span><span class="d flat">${t[2]}</span><span class="d ${t[4]}">${t[3]}</span>${spark(t[5]*7+per+sseed(),t[4]==='up')}</div>`).join('');
 }
 
 /* ---------- Pulso del día ---------- */
 function drawPulse(){
-  const a=agg(rows()),tot=Math.round(a.vol*1.04);
+  const a=agg(scope()),tot=Math.round(a.vol*1.04);
   const P=[['Recibidos sin clasificar',.04,'--m2'],['En CEDIS',.09,'--m3'],['En ruta',.27,'--m4'],['Entregados',.551,'--teal'],['Fallidos / reprogramados',.035,'--warn'],['Devueltos al aliado',.014,'--crit']];
   $('#pulseSub').textContent=fmt(tot)+' envíos programados hoy';
   $('#pipe').innerHTML=P.map(p=>`<div style="flex:${p[1]};background:var(${p[2]})" data-t="${p[0]}: <b>${fmt(Math.round(tot*p[1]))}</b> (${fmt(p[1]*100,1)}%)">${p[1]>.08?fmt(p[1]*100,0)+'%':''}</div>`).join('');
@@ -787,7 +794,7 @@ for(const k in MAP.states){const p=document.createElementNS(NS,'path');p.setAttr
 const C0=MAP.cities.CDMX, RAMP=['--m1','--m2','--m3','--m4','--m5'];
 function drawFlows(){
   gF.innerHTML='';gH.innerHTML='';const rs=rows(),max=Math.max(...rs.map(r=>r.vol));
-  if($('#flows').checked)rs.filter(r=>r.k!=='df').forEach(r=>{const c=MAP.cities[HUB[r.k]],mx=(C0[0]+c[0])/2,my=(C0[1]+c[1])/2,dx=c[0]-C0[0],dy=c[1]-C0[1];
+  if($('#flows').checked)rs.filter(r=>r.k!=='df'&&(!state.sel||r.k===state.sel)).forEach(r=>{const c=MAP.cities[HUB[r.k]],mx=(C0[0]+c[0])/2,my=(C0[1]+c[1])/2,dx=c[0]-C0[0],dy=c[1]-C0[1];
     const p=document.createElementNS(NS,'path');p.setAttribute('d',`M${C0[0]},${C0[1]}Q${mx-dy*.18},${my+dx*.18} ${c[0]},${c[1]}`);p.setAttribute('class','flow');p.setAttribute('stroke-width',(.8+3.2*r.vol/max).toFixed(2));gF.append(p)});
   rs.forEach(r=>{const c=MAP.cities[HUB[r.k]],ci=document.createElementNS(NS,'circle');ci.setAttribute('cx',c[0]);ci.setAttribute('cy',c[1]);ci.setAttribute('r',r.k==='df'?7:3.6+4*r.vol/max);ci.setAttribute('class','hub'+(r.k==='df'?' main':''));ci.dataset.t=`<b>Plaza ${HUB[r.k]}</b><br>${fmt(r.vol)} entregas/día`;gH.append(ci);
     if(r.vol/max>.18||r.k==='df'){const t=document.createElementNS(NS,'text');t.setAttribute('x',c[0]+9);t.setAttribute('y',c[1]+3);t.setAttribute('class','maplbl');t.textContent=HUB[r.k];gH.append(t)}});
@@ -817,23 +824,23 @@ function drawDetail(){
   const s=ST[k].trend,lo=86,hi=100,x=i=>30+i*284/29,y=v=>78-(v-lo)/(hi-lo)*70,d=s.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1)).join('');
   $('#dTrend').innerHTML=`<text class="axis" x="0" y="${y(95)+3}">95%</text><line x1="30" x2="314" y1="${y(95)}" y2="${y(95)}" stroke="var(--fg)" stroke-dasharray="3 3" opacity=".6"/><path d="${d}" fill="none" stroke="var(--teal)" stroke-width="2"/><circle cx="${x(29)}" cy="${y(s[29])}" r="3.5" fill="var(--teal)"/><text class="axis" x="30" y="90">OTIF 30 días</text>`;
 }
-map.addEventListener('click',e=>{const p=e.target.closest('.st');if(p&&WEIGHT[p.dataset.k]&&rows().some(r=>r.k===p.dataset.k)){state.sel=state.sel===p.dataset.k?null:p.dataset.k;drawMap();drawDetail()}});
-$('#rank').addEventListener('click',e=>{const r=e.target.closest('.r');if(r){state.sel=r.dataset.k;drawMap();drawDetail()}});
-$('#rank').addEventListener('keydown',e=>{const r=e.target.closest('.r');if(r&&e.key==='Enter'){state.sel=r.dataset.k;drawMap();drawDetail()}});
-$('#dClose').addEventListener('click',()=>{state.sel=null;drawMap();drawDetail()});
+map.addEventListener('click',e=>{const p=e.target.closest('.st');if(p&&WEIGHT[p.dataset.k]&&rows().some(r=>r.k===p.dataset.k)){state.sel=state.sel===p.dataset.k?null:p.dataset.k;all()}});
+$('#rank').addEventListener('click',e=>{const r=e.target.closest('.r');if(r){state.sel=r.dataset.k;all()}});
+$('#rank').addEventListener('keydown',e=>{const r=e.target.closest('.r');if(r&&e.key==='Enter'){state.sel=r.dataset.k;all()}});
+$('#dClose').addEventListener('click',()=>{state.sel=null;all()});
 $('#metricT').addEventListener('click',e=>{const b=e.target.closest('button');if(b){state.metric=b.dataset.m;drawMap()}});
 $('#flows').addEventListener('change',drawFlows);
 
 /* ---------- Alertas ---------- */
 function drawAlerts(){
-  const out=[];rows().forEach(r=>{
+  const out=[];scope().forEach(r=>{
     if(r.fa<85)out.push(['crit',`${r.n}: primer intento ${fmt(r.fa,1)}%`,'Re-sectorizar y confirmar por WhatsApp']);
     if(r.otif<90)out.push(['crit',`${r.n}: OTIF ${fmt(r.otif,1)}%`,'Apoyo de operadores desde plaza vecina']);
     if(r.inc>3)out.push(['crit',`${r.n}: ${fmt(r.inc,1)} incidencias por mil`,'Auditoría de rutas en zona de riesgo']);
     if(r.cpe/TARIFA>.85)out.push(['warn',`${r.n}: costo por entrega ${fmt(r.cpe/TARIFA*100,0)}% de la tarifa`,'Revisar mezcla de vehículos'])});
-  if(state.seg==='all'||state.seg==='sup')out.unshift(['warn','Supermercado: 4 rutas con más de 2.5 h en unidad','Resecuenciar perecederos al inicio de ruta']);
-  out.push(['warn','Lunes: pronóstico P90 supera capacidad','Activar operadores eventuales']);
-  out.push(['good','Puebla: 1,870 envíos/mes de aliados actuales sin cobertura','Evaluar apertura de plaza']);
+  if(!state.sel&&(state.seg==='all'||state.seg==='sup'))out.unshift(['warn','Supermercado: 4 rutas con más de 2.5 h en unidad','Resecuenciar perecederos al inicio de ruta']);
+  if(state.sel){const r=scope()[0];if(r.fa<90&&r.fa>=85)out.push(['warn',`${r.n}: primer intento ${fmt(r.fa,1)}% bajo meta`,'Confirmar citas por WhatsApp en zonas con más fallidos']);if(r.otif<95&&r.otif>=90)out.push(['warn',`${r.n}: OTIF ${fmt(r.otif,1)}% bajo meta 95%`,'Revisar rutas con salida tardía de CEDIS']);if(!out.length)out.push(['good',`${r.n}: sin alertas críticas`,'Mantener plan de rutas actual'])}
+  else{out.push(['warn','Lunes: pronóstico P90 supera capacidad','Activar operadores eventuales']);out.push(['good','Puebla: 1,870 envíos/mes de aliados actuales sin cobertura','Evaluar apertura de plaza'])}
   $('#alerts').innerHTML=out.slice(0,5).map(a=>`<div class="alert" style="--sev:var(--${a[0]})"><div><div>${a[1]}</div><div class="act">→ ${a[2]}</div></div></div>`).join('');
 }
 
@@ -849,9 +856,9 @@ function crosshair(svg,{x0,x1,y0,y1,n,x,y,series,label,fmtv}){
   ov.addEventListener('pointerleave',()=>{ln.innerHTML='';tip.hidden=true});
 }
 function drawTrend(){
-  const rs=rows(),tot=rs.reduce((a,r)=>a+r.vol,0),base=Array.from({length:30},(_,i)=>rs.reduce((a,r)=>a+ST[r.k].trend[i]*r.vol,0)/tot);
-  const LV={sup:96.1,eco:92.4,cc:98.3},avg=base.reduce((a,b)=>a+b,0)/30,va=adj();
-  const series=Object.entries(SEG).map(([k,s],j)=>{const r=rng(20+j);return{k,n:s.n,sh:{sup:'Súper',eco:'E-com',cc:'C. com.'}[k],col:s.col,vals:base.map(v=>Math.min(99.6,v-avg+LV[k]+(va.otif-s.otif*(state.seg===k?1:0))*0+(r()-.5)*.9))}});
+  const rs=scope(),tot=rs.reduce((a,r)=>a+r.vol,0),base=Array.from({length:30},(_,i)=>rs.reduce((a,r)=>a+ST[r.k].trend[i]*r.vol,0)/tot);
+  const LV={sup:96.1,eco:92.4,cc:98.3},avg=base.reduce((a,b)=>a+b,0)/30,va=adj(),dl=state.sel?agg(rs).otif-agg(rows()).otif:0;
+  const series=Object.entries(SEG).map(([k,s],j)=>{const r=rng(20+j);return{k,n:s.n,sh:{sup:'Súper',eco:'E-com',cc:'C. com.'}[k],col:s.col,vals:base.map(v=>Math.min(99.6,v-avg+LV[k]+dl+(va.otif-s.otif*(state.seg===k?1:0))*0+(r()-.5)*.9))}});
   const show=state.seg==='all'?series:series.filter(s=>s.k===state.seg);
   const x0=34,x1=250,y0=146,y1=10,lo=88,hi=100,x=i=>x0+i*(x1-x0)/29,y=v=>y0-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(y0-y1);
   const svg=$('#cTrend');
@@ -864,7 +871,7 @@ function drawTrend(){
   $('#trendLeg').innerHTML=show.map(s=>`<span class="sw"><i style="background:var(${s.col})"></i>${s.n}</span>`).join('')+'<span class="sw"><i class="dash"></i>meta 95%</span>';
 }
 function drawHour(){
-  const hrs=Array.from({length:14},(_,i)=>i+8),r=rng(9),a=agg(rows());
+  const hrs=Array.from({length:14},(_,i)=>i+8),r=rng(9+sseed()),a=agg(scope());
   const tot=hrs.map(h=>Math.max(2,Math.exp(-((h-12.5)**2)/6)*100+Math.exp(-((h-17)**2)/4)*55+r()*8));
   const late=tot.map((v,i)=>v*(hrs[i]>=17?.14:hrs[i]>=12&&hrs[i]<=14?.09:.04));
   const x0=34,x1=312,y0=146,y1=10,max=Math.max(...tot),bw=(x1-x0)/14,y=v=>y0-v/max*(y0-y1),scale=a.vol/tot.reduce((s,v)=>s+v,0);
@@ -875,6 +882,7 @@ function drawHour(){
 function drawPareto(){
   const base=[['Destinatario ausente',38],['Dirección incorrecta',21],['Rechazo del destinatario',14],['Negocio cerrado',9],['Zona de riesgo / acceso',8],['Reprogramado',6],['Otro',4]];
   if(state.seg==='sup'){base[0][1]=31;base[2][1]=22}if(state.seg==='cc'){base[3][1]=24;base[0][1]=20}
+  if(state.sel){const q=rng(sseed());base.forEach(b=>b[1]*=.6+q()*.8)}
   const SH={'Destinatario ausente':'Ausente','Dirección incorrecta':'Direcc.','Rechazo del destinatario':'Rechazo','Negocio cerrado':'Cerrado','Zona de riesgo / acceso':'Riesgo','Reprogramado':'Reprog.','Otro':'Otro'};
   const t=base.reduce((a,b)=>a+b[1],0),d=base.map(b=>[b[0],b[1]/t*100]).sort((a,b)=>b[1]-a[1]);let c=0;const cum=d.map(b=>c+=b[1]);
   const x0=34,x1=312,y0=140,y1=10,bw=(x1-x0)/d.length,y=v=>y0-v/100*(y0-y1),cx=i=>x0+i*bw+bw/2;
@@ -884,16 +892,16 @@ function drawPareto(){
     d.map((b,i)=>`<text class="axis" x="${cx(i)}" y="${y0+(i%2?24:13)}" text-anchor="middle" font-size="9">${SH[b[0]]}</text>`).join('');
 }
 function drawFc(){
-  const a=agg(rows()),r=rng(11),start=new Date(2026,10,7),dn=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],wk=[.72,1.18,1.08,1.02,1.0,1.05,.9];
+  const a=agg(scope()),r=rng(11+sseed()),start=new Date(2026,10,7),dn=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'],wk=[.72,1.18,1.08,1.02,1.0,1.05,.9];
   const days=Array.from({length:14},(_,i)=>{const dt=new Date(start);dt.setDate(start.getDate()+i);const peak=i>=9&&i<=12?1.22:1;const m=a.vol*wk[dt.getDay()]*peak*(1+(r()-.5)*.04);return{lbl:dn[dt.getDay()]+' '+dt.getDate(),m,lo:m*.9,hi:m*1.11,cap:a.vol*(dt.getDay()===0?.85:1.35),peak:peak>1}});
   const x0=48,x1=548,y0=180,y1=12,max=Math.max(...days.map(d=>Math.max(d.hi,d.cap)))*1.05,x=i=>x0+i*(x1-x0)/13,y=v=>y0-v/max*(y0-y1);
   const band=days.map((d,i)=>(i?'L':'M')+x(i)+','+y(d.hi)).join('')+days.slice().reverse().map((d,j)=>'L'+x(13-j)+','+y(d.lo)).join('')+'Z';
   const capP=days.map((d,i)=>(i?'L':'M')+x(i)+','+y(d.cap)).join(''),mP=days.map((d,i)=>(i?'L':'M')+x(i)+','+y(d.m)).join('');
   const over=days.map((d,i)=>({...d,i})).filter(d=>d.hi>d.cap);const pi=days.findIndex(d=>d.peak);
-  const ticks=[0,max/3,2*max/3].map(v=>Math.round(v/1000)*1000);
+  const unit=Math.pow(10,Math.floor(Math.log10(max/3))),ticks=[0,max/3,2*max/3].map(v=>Math.round(v/unit)*unit);
   const svg=$('#cFc');
   svg.innerHTML=`<rect x="${x(pi)-12}" y="${y1}" width="${x(pi+3)-x(pi)+24}" height="${y0-y1}" fill="var(--accent-soft)" opacity=".7"/><text class="axis halo" x="${x(pi)-8}" y="${y0-6}" style="fill:var(--accent)">Campaña de descuentos (ej.)</text>`+
-    yAxis(ticks,y,x0,x1,v=>fmt(v/1000,0)+' k')+`<path d="${band}" fill="var(--teal-soft)"/><path d="${mP}" fill="none" stroke="var(--teal)" stroke-width="2"/><path d="${capP}" fill="none" stroke="var(--fg)" stroke-width="1.5" stroke-dasharray="5 4"/>`+
+    yAxis(ticks,y,x0,x1,v=>v>=10000?fmt(v/1000,0)+' k':fmt(v))+`<path d="${band}" fill="var(--teal-soft)"/><path d="${mP}" fill="none" stroke="var(--teal)" stroke-width="2"/><path d="${capP}" fill="none" stroke="var(--fg)" stroke-width="1.5" stroke-dasharray="5 4"/>`+
     over.map(d=>`<circle cx="${x(d.i)}" cy="${y(d.hi)}" r="5" fill="var(--crit)" stroke="var(--surface)" stroke-width="2"/>`).join('')+
     days.map((d,i)=>`<text class="axis" x="${x(i)}" y="198" text-anchor="middle">${d.lbl.split(' ')[0]}</text><text class="axis" x="${x(i)}" y="210" text-anchor="middle">${d.lbl.split(' ')[1]}</text>`).join('');
   crosshair(svg,{x0,x1,y0,y1,n:14,x,y,series:[{n:'Pronóstico',col:'--teal',vals:days.map(d=>d.m)},{n:'Capacidad',col:'--fg',vals:days.map(d=>d.cap)}],label:i=>days[i].lbl+' nov · P90 '+fmt(Math.round(days[i].hi)),fmtv:v=>fmt(Math.round(v))});
@@ -901,7 +909,7 @@ function drawFc(){
   $('#fcIns').innerHTML=worst?`<b>${over.length} días</b> con riesgo de exceder capacidad. Peor caso <b>${worst.lbl} nov</b>: faltan ~${fmt(Math.ceil((worst.hi-worst.cap)/48))} operadores (48 entregas por operador al día). Decisión: activar eventuales con 72 h de anticipación.`:'La capacidad cubre el pronóstico P90 de los próximos 14 días.';
 }
 function drawHeat(){
-  const dn=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],wk=[1.18,1.08,1.02,1,1.05,.9,.72],hrs=Array.from({length:14},(_,i)=>i+8),r=rng(13),a=agg(rows());
+  const dn=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],wk=[1.18,1.08,1.02,1,1.05,.9,.72],hrs=Array.from({length:14},(_,i)=>i+8),r=rng(13+sseed()),a=agg(scope());
   const vals=dn.map((d,di)=>hrs.map(h=>(Math.exp(-((h-12.5)**2)/6)+Math.exp(-((h-(di>=5?11:17))**2)/4)*.55+.05)*wk[di]*(0.9+r()*.2)));
   const mx=Math.max(...vals.flat()),tot=vals.flat().reduce((s,v)=>s+v,0),sc=a.vol*7/tot;
   const x0=40,cw=(410-x0)/14,ch=26;
@@ -911,34 +919,39 @@ function drawHeat(){
 function drawVeh(){
   const ks=Object.keys(VEH),x0=72,x1=296,max=80,x=v=>x0+v/max*(x1-x0);
   $('#cVeh').innerHTML=[0,20,40,60,80].map(t=>`<line class="gridl" x1="${x(t)}" x2="${x(t)}" y1="8" y2="132"/><text class="axis" x="${x(t)}" y="146" text-anchor="middle">$${t}</text>`).join('')+
-    ks.map((k,i)=>{const v=VEH[k].cpe,yy=14+i*30,on=state.veh==='all'||state.veh===k;return `<text class="axis fg" x="${x0-6}" y="${yy+12}" text-anchor="end">${VEH[k].n}</text><rect x="${x0}" y="${yy}" width="${x(v)-x0}" height="16" fill="var(--teal)" opacity="${on?1:.3}" rx="2" data-t="<b>${VEH[k].n}</b><br>$${v} por entrega · ${fmt(v/TARIFA*100,0)}% de la tarifa<br>${VEH[k].kpe} km por entrega"/><text class="axis fg" x="${x(v)+4}" y="${yy+12}">$${v}</text>`}).join('')+
+    ks.map((k,i)=>{const v=Math.round(VEH[k].cpe+(state.sel?ST[state.sel].cpe-47:0)),yy=14+i*30,on=state.veh==='all'||state.veh===k;return `<text class="axis fg" x="${x0-6}" y="${yy+12}" text-anchor="end">${VEH[k].n}</text><rect x="${x0}" y="${yy}" width="${x(v)-x0}" height="16" fill="var(--teal)" opacity="${on?1:.3}" rx="2" data-t="<b>${VEH[k].n}</b><br>$${v} por entrega · ${fmt(v/TARIFA*100,0)}% de la tarifa"/><text class="axis fg" x="${x(v)+4}" y="${yy+12}">$${v}</text>`}).join('')+
     `<line x1="${x(TARIFA)}" x2="${x(TARIFA)}" y1="6" y2="134" stroke="var(--fg)" stroke-dasharray="4 3" stroke-width="1.2"/><text class="axis fg" x="${x(TARIFA)-4}" y="162" text-anchor="end">tarifa $${TARIFA}</text>`;
 }
 function drawOcc(){
+  const q=rng(40+sseed()),OC=Object.fromEntries(Object.keys(VEH).map(k=>[k,Math.round(Math.min(97,VEH[k].occ+(state.sel?(q()-.5)*16:0)))]));
   const ks=Object.keys(VEH),x0=72,x1=296,x=v=>x0+v/100*(x1-x0);
   $('#cOcc').innerHTML=[0,25,50,75,100].map(t=>`<line class="gridl" x1="${x(t)}" x2="${x(t)}" y1="8" y2="132"/><text class="axis" x="${x(t)}" y="146" text-anchor="middle">${t}%</text>`).join('')+
-    ks.map((k,i)=>{const v=VEH[k].occ,yy=14+i*30,s=v>=80?'teal':v>=70?'warn':'crit',on=state.veh==='all'||state.veh===k;return `<text class="axis fg" x="${x0-6}" y="${yy+12}" text-anchor="end">${VEH[k].n}</text><rect x="${x0}" y="${yy}" width="${x(v)-x0}" height="16" fill="var(--${s})" opacity="${on?1:.3}" rx="2" data-t="<b>${VEH[k].n}</b><br>Ocupación ${v}% · meta 80%"/><text class="axis fg" x="${x(v)+4}" y="${yy+12}">${v}%</text>`}).join('')+
+    ks.map((k,i)=>{const v=OC[k],yy=14+i*30,s=v>=80?'teal':v>=70?'warn':'crit',on=state.veh==='all'||state.veh===k;return `<text class="axis fg" x="${x0-6}" y="${yy+12}" text-anchor="end">${VEH[k].n}</text><rect x="${x0}" y="${yy}" width="${x(v)-x0}" height="16" fill="var(--${s})" opacity="${on?1:.3}" rx="2" data-t="<b>${VEH[k].n}</b><br>Ocupación ${v}% · meta 80%"/><text class="axis fg" x="${x(v)+4}" y="${yy+12}">${v}%</text>`}).join('')+
     `<line x1="${x(80)}" x2="${x(80)}" y1="6" y2="134" stroke="var(--fg)" stroke-dasharray="4 3" stroke-width="1.2"/><text class="axis fg" x="${x(80)+4}" y="162">meta 80%</text>`;
 }
 function drawProd(){
-  const bins=[3,4,5,6,7,8,9,10,11,12,13],cnt=[22,48,96,168,231,244,198,142,88,41,17];
-  const tot=cnt.reduce((a,b)=>a+b,0),under=cnt.slice(0,3).reduce((a,b)=>a+b,0),x0=34,x1=312,y0=140,y1=14,mx=260,bw=(x1-x0)/bins.length,y=v=>y0-v/mx*(y0-y1);
-  $('#cProd').innerHTML=yAxis([0,100,200],y,x0,x1,v=>v)+cnt.map((c,i)=>`<rect x="${(x0+i*bw+2).toFixed(1)}" y="${y(c)}" width="${(bw-4).toFixed(1)}" height="${(y0-y(c)).toFixed(1)}" fill="var(--${bins[i]<6?'warn':'teal'})" rx="2" data-t="<b>${bins[i]}–${bins[i]+1} paradas/h</b><br>${c} operadores"/>`).join('')+
+  const bins=[3,4,5,6,7,8,9,10,11,12,13],c0=[22,48,96,168,231,244,198,142,88,41,17],sh=state.sel?Math.round((88-ST[state.sel].fa)/3):0,fct=state.sel?ST[state.sel].vol/BASE*1.05:1;
+  const cnt=c0.map((c,i)=>Math.max(state.sel?0:1,Math.round(c0[Math.max(0,Math.min(10,i+sh))]*fct)));
+  const tot=cnt.reduce((a,b)=>a+b,0),under=cnt.slice(0,3).reduce((a,b)=>a+b,0),x0=34,x1=312,y0=140,y1=14,mx=Math.max(...cnt)*1.12,bw=(x1-x0)/bins.length,y=v=>y0-v/mx*(y0-y1);
+  $('#cProd').innerHTML=yAxis([0,Math.round(mx/2.4),Math.round(mx/1.2)],y,x0,x1,v=>v)+cnt.map((c,i)=>`<rect x="${(x0+i*bw+2).toFixed(1)}" y="${y(c)}" width="${(bw-4).toFixed(1)}" height="${(y0-y(c)).toFixed(1)}" fill="var(--${bins[i]<6?'warn':'teal'})" rx="2" data-t="<b>${bins[i]}–${bins[i]+1} paradas/h</b><br>${c} operadores"/>`).join('')+
     bins.map((b,i)=>`<text class="axis" x="${(x0+i*bw+bw/2).toFixed(1)}" y="154" text-anchor="middle">${b}</text>`).join('')+
     `<text class="axis fg" x="${x1}" y="${y1+4}" text-anchor="end">${fmt(tot)} operadores · ${fmt(under/tot*100,0)}% bajo meta</text><text class="axis" x="${x1}" y="168" text-anchor="end">paradas por hora</text>`;
 }
 
 /* ---------- Hex urbano ---------- */
-const HEX=(()=>{const r=rng(77),out=[],s=11,w=Math.sqrt(3)*s,h=1.5*s,cs=[[300,165,1],[230,110,.7],[390,120,.6],[420,230,.8],[180,220,.55],[330,260,.5],[500,175,.45]];
+function genHex(seed){const r=rng(seed),out=[],s=11,w=Math.sqrt(3)*s,h=1.5*s,j=seed===77?0:1,cs=[[300,165,1],[230,110,.7],[390,120,.6],[420,230,.8],[180,220,.55],[330,260,.5],[500,175,.45]].map(c=>[c[0]+(r()-.5)*140*j,c[1]+(r()-.5)*80*j,c[2]*(1+(r()-.5)*.6*j)]);
   for(let row=0;row*h<330;row++)for(let col=0;col*w<640;col++){const cx=col*w+(row%2?w/2:0)+10,cy=row*h+12;if(((cx-320)/300)**2+((cy-170)/150)**2>1+r()*.12)continue;
     let d=0;cs.forEach(([x,y,a])=>{d+=a*Math.exp(-((cx-x)**2+(cy-y)**2)/(2*65**2))});
     const f=Math.min(1,.05+r()*.07+Math.exp(-((cx-430)**2+(cy-240)**2)/(2*45**2))*.22+Math.exp(-((cx-175)**2+(cy-215)**2)/(2*35**2))*.16);
     const sup=Math.exp(-((cx-230)**2+(cy-110)**2)/(2*80**2))*.7+Math.exp(-((cx-390)**2+(cy-120)**2)/(2*70**2))*.6+r()*.1;
-    out.push({cx,cy,d:d*(.85+r()*.3),f,sup})}return out})();
+    out.push({cx,cy,d:d*(.85+r()*.3),f,sup})}out.seed=seed;return out}
+let HEX=genHex(77);
 const hexPath=(cx,cy,s)=>{let p='';for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-30);p+=(i?'L':'M')+(cx+s*Math.cos(a)).toFixed(1)+','+(cy+s*Math.sin(a)).toFixed(1)}return p+'Z'};
 const HEXL={vol:{n:'Densidad de entregas',f:h=>h.d},fail:{n:'Intentos fallidos',f:h=>h.f},sup:{n:'Pedidos de supermercado',f:h=>h.sup}};
 for(const k in HEXL)HEXL[k].mx=Math.max(...HEX.map(HEXL[k].f));
 function drawHex(){
+  const want=77+sseed();if(HEX.seed!==want){HEX=genHex(want);for(const k in HEXL)HEXL[k].mx=Math.max(...HEX.map(HEXL[k].f))}
+  $('#hexTitle').textContent='Mapa de calor urbano · '+(state.sel&&state.sel!=='df'&&state.sel!=='mx'?'zona urbana de '+HUB[state.sel]:'Valle de México');
   const L=HEXL[state.hex],fail=state.hex==='fail',ramp=fail?['--m1','--warn-soft','--warn','--accent','--crit']:RAMP;
   const hubs=[[300,165,'MH-01 Centro'],[420,225,'MH-02 Oriente'],[230,110,'MH-03 Norte']];
   $('#hexmap').innerHTML=HEX.map(h=>{const v=L.f(h),t=v/L.mx;return `<path class="hex" d="${hexPath(h.cx,h.cy,10.6)}" fill="var(${ramp[Math.min(4,Math.floor(t*5))]})" data-t="Celda H3 · ${L.n}: <b>${fail?fmt(v*100,0)+'%':fmt(Math.round(v*(state.hex==='sup'?60:140)))+(state.hex==='sup'?' pedidos/día':' entregas/día')}</b>"/>`}).join('')+
@@ -954,13 +967,13 @@ $('#hexT').addEventListener('click',e=>{const b=e.target.closest('button');if(b)
 /* ---------- Rutas en riesgo ---------- */
 const ROUTES=[['R-CDMX-114','CDMX','C','eco',62,38,'18:00','19:10','crit'],['R-ACA-012','Acapulco','S','eco',48,22,'19:00','20:05','crit'],['R-EDOMEX-208','Toluca','C','sup',24,15,'15:00','15:40','crit'],['R-MER-019','Mérida','S','sup',22,16,'16:00','16:20','warn'],['R-MTY-077','Monterrey','N','eco',58,41,'19:00','19:15','warn'],['R-GDL-031','Guadalajara','C','cc',18,12,'17:00','17:05','warn'],['R-TIJ-045','Tijuana','N','eco',51,40,'19:00','18:55','good'],['R-OAX-006','Oaxaca','S','cc',14,9,'18:00','17:50','good']];
 function drawRoutes(){
-  const list=ROUTES.filter(r=>(state.reg==='all'||r[2]===state.reg)&&(state.seg==='all'||r[3]===state.seg)).slice(0,6);
-  $('#routes').innerHTML='<thead><tr><th>Ruta</th><th>Avance</th><th>Ventana → ETA</th><th>Riesgo</th></tr></thead><tbody>'+(list.length?list.map(r=>`<tr><td style="white-space:nowrap"><b class="num">${r[0]}</b><br><span class="segdot" style="font-size:12px;color:var(--muted)"><i style="background:var(${SEG[r[3]].col})"></i>${r[1]} · ${SEG[r[3]].n}</span></td><td><div class="prog" data-t="${r[5]} de ${r[4]} paradas"><i style="width:${r[5]/r[4]*100}%"></i></div><span style="font-size:11.5px;color:var(--muted)" class="num">${r[5]}/${r[4]} paradas</span></td><td class="num" style="white-space:nowrap">${r[6]} → <b style="color:var(--${r[8]==='good'?'fg':r[8]})">${r[7]}</b></td><td>${chip(r[8])}</td></tr>`).join(''):'<tr><td colspan="4" class="foot-note">Sin rutas en riesgo para este filtro.</td></tr>')+'</tbody>';
+  const list=ROUTES.filter(r=>(state.reg==='all'||r[2]===state.reg)&&(state.seg==='all'||r[3]===state.seg)&&(!state.sel||r[1]===HUB[state.sel])).slice(0,6);
+  $('#routes').innerHTML='<thead><tr><th>Ruta</th><th>Avance</th><th>Ventana → ETA</th><th>Riesgo</th></tr></thead><tbody>'+(list.length?list.map(r=>`<tr><td style="white-space:nowrap"><b class="num">${r[0]}</b><br><span class="segdot" style="font-size:12px;color:var(--muted)"><i style="background:var(${SEG[r[3]].col})"></i>${r[1]} · ${SEG[r[3]].n}</span></td><td><div class="prog" data-t="${r[5]} de ${r[4]} paradas"><i style="width:${r[5]/r[4]*100}%"></i></div><span style="font-size:11.5px;color:var(--muted)" class="num">${r[5]}/${r[4]} paradas</span></td><td class="num" style="white-space:nowrap">${r[6]} → <b style="color:var(--${r[8]==='good'?'fg':r[8]})">${r[7]}</b></td><td>${chip(r[8])}</td></tr>`).join(''):'<tr><td colspan="4" class="foot-note">Sin rutas en riesgo para este filtro. Todas las rutas van dentro de su ventana.</td></tr>')+'</tbody>';
 }
 
 /* ---------- Aliados ---------- */
 function drawClients(){
-  const a=agg(rows()),r=rng(5+state.per);
+  const a=agg(scope()),r=rng(5+state.per+sseed());
   const C=[['E-commerce A','eco',.24],['Supermercado B','sup',.17],['E-commerce C','eco',.13],['Supermercado D','sup',.11],['Centro comercial E','cc',.08],['E-commerce G','eco',.07],['Supermercado H','sup',.06],['Centro comercial F','cc',.05]].filter(c=>state.seg==='all'||c[1]===state.seg);
   $('#clients').innerHTML='<thead><tr><th>Aliado</th><th>Segmento</th><th>Envíos</th><th>OTIF</th><th>Primer intento</th><th>Meta SLA</th><th>Tendencia OTIF</th><th>Estado</th></tr></thead><tbody>'+C.map(([n,sg,s],i)=>{
     const S=SEG[sg],meta={sup:97,eco:95,cc:98}[sg],o=Math.min(99.6,a.otif-(state.seg==='all'?0:S.otif)+S.otif+1.2+(r()-.5)*4),fa=Math.min(99,a.fa+S.fa*(state.seg==='all'?1:0)+(r()-.5)*3),st=status(o,meta,true,.02);
@@ -969,8 +982,16 @@ function drawClients(){
     return `<tr><td><b>${n}</b></td><td><span class="segdot"><i style="background:var(${S.col})"></i>${S.n}</span></td><td class="num">${fmt(Math.round(a.vol*(state.seg==='all'?1:1/S.share)*s*state.per))}</td><td class="num">${fmt(o,1)}%</td><td class="num">${fmt(fa,1)}%</td><td class="num">≥ ${meta}%</td><td>${sp}</td><td>${chip(st)}</td></tr>`}).join('')+'</tbody>';
 }
 
-function all(){drawTiles();drawPulse();drawMap();drawDetail();drawAlerts();drawTrend();drawHour();drawPareto();drawFc();drawHeat();drawVeh();drawOcc();drawProd();drawHex();drawRoutes();drawClients()}
-['fPer','fReg','fSeg','fVeh'].forEach(id=>$('#'+id).addEventListener('change',()=>{state.per=+$('#fPer').value;state.reg=$('#fReg').value;state.seg=$('#fSeg').value;state.veh=$('#fVeh').value;all()}));
+function drawScope(){
+  const est=$('#fEst'),rs=rows().sort((a,b)=>a.n.localeCompare(b.n,'es'));
+  est.innerHTML='<option value="">Todos</option>'+rs.map(r=>`<option value="${r.k}"${r.k===state.sel?' selected':''}>${r.n}</option>`).join('');
+  const sc=$('#scope'),r=state.sel&&rs.find(x=>x.k===state.sel);sc.classList.toggle('on',!!r);
+  const regN={all:'Nacional',N:'Región Norte',C:'Región Centro-Bajío',S:'Región Sur-Sureste'}[state.reg];
+  sc.innerHTML=r?`<span>Vista de plaza</span><b>${r.n} · plaza ${HUB[r.k]}</b><span style="color:var(--muted)">Todos los indicadores muestran solo este estado</span><button type="button" id="scopeX">× Ver ${regN.toLowerCase()==='nacional'?'nacional':regN}</button>`:`<span>Vista</span><b>${regN}</b><span style="color:var(--muted)">${rs.length} estados · toca un estado en el mapa o elígelo en el filtro para ver solo esa plaza</span>`;
+  const x=$('#scopeX');if(x)x.addEventListener('click',()=>{state.sel=null;all()});
+}
+function all(){if(state.sel&&!rows().some(r=>r.k===state.sel))state.sel=null;drawScope();drawTiles();drawPulse();drawMap();drawDetail();drawAlerts();drawTrend();drawHour();drawPareto();drawFc();drawHeat();drawVeh();drawOcc();drawProd();drawHex();drawRoutes();drawClients()}
+['fPer','fReg','fSeg','fVeh','fEst'].forEach(id=>$('#'+id).addEventListener('change',()=>{state.per=+$('#fPer').value;state.reg=$('#fReg').value;state.seg=$('#fSeg').value;state.veh=$('#fVeh').value;if(id==='fEst')state.sel=$('#fEst').value||null;all()}));
 drawKpis();drawNS();drawSLA();all();
 /* ---------- Modo claro / oscuro ---------- */
 const root=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
