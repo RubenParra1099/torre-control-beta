@@ -1,0 +1,710 @@
+<!doctype html>
+<html lang="es-MX">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Propuesta de sistema de indicadores de control y toma de decisiones para Servicio Integral BETA: módulos de captura, KPIs, tableros y mapas.">
+<meta property="og:title" content="Torre de Control BETA">
+<meta property="og:description" content="Sistema de indicadores y toma de decisiones para última milla.">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Torre de Control BETA</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: guía de propuesta en columna con bandas; la demo es un "cuarto de control" a todo lo ancho con grid de paneles */
+:root{
+  --bg:#F2F4F3; --surface:#FFFFFF; --sunk:#E6EAE8; --line:#CDD5D2; --fg:#14211F; --muted:#56635F;
+  --accent:#E2570F; --accent-ink:#FFFFFF; --accent-soft:#FBE3D5; --teal:#0F6E68; --teal-soft:#D3E8E5;
+  --good:#1F8A4C; --warn:#C98A06; --crit:#C8322B; --nocov:#DADFDD;
+  --m1:#E5F0EE; --m2:#B4D7D2; --m3:#6FB0A8; --m4:#2F8A82; --m5:#0F5A55;
+  --display:"Archivo","Arial Narrow",system-ui,sans-serif; --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0E1513; --surface:#16201E; --sunk:#1D2926; --line:#2C3A37; --fg:#E4ECE9; --muted:#9AA9A4;
+  --accent:#FF7A33; --accent-ink:#1A0C04; --accent-soft:#3A2214; --teal:#4FC1B6; --teal-soft:#14332F;
+  --good:#47C07A; --warn:#E3AE36; --crit:#F0645B; --nocov:#26312E;
+  --m1:#173430; --m2:#1E5650; --m3:#2B8178; --m4:#47ADA2; --m5:#8FE0D5; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1513; --surface:#16201E; --sunk:#1D2926; --line:#2C3A37; --fg:#E4ECE9; --muted:#9AA9A4;
+  --accent:#FF7A33; --accent-ink:#1A0C04; --accent-soft:#3A2214; --teal:#4FC1B6; --teal-soft:#14332F;
+  --good:#47C07A; --warn:#E3AE36; --crit:#F0645B; --nocov:#26312E;
+  --m1:#173430; --m2:#1E5650; --m3:#2B8178; --m4:#47ADA2; --m5:#8FE0D5; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.55}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--surface)}
+.wrap{max-width:1200px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+h1,h2,h3{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.1}
+h2{font-size:clamp(26px,3.4vw,38px);font-weight:750;font-stretch:88%;letter-spacing:-.01em}
+h3{font-size:18px;font-weight:700;font-stretch:95%}
+p{margin:0}
+.eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--teal)}
+.lede{color:var(--muted);max-width:68ch;font-size:16px}
+.mono{font-family:var(--mono)}
+.num{font-variant-numeric:tabular-nums}
+
+/* nav */
+.nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--surface);border-bottom:1px solid var(--line)}
+.nav .wrap{display:flex;align-items:center;gap:18px;padding-block:10px;overflow-x:auto;scrollbar-width:none}
+.brand{font-family:var(--display);font-weight:800;font-stretch:115%;font-size:15px;white-space:nowrap;display:flex;align-items:center;gap:8px}
+.brand i{display:inline-block;width:10px;height:10px;background:var(--accent);transform:rotate(45deg)}
+.nav a{color:var(--muted);text-decoration:none;font-size:13px;white-space:nowrap}
+.nav a:hover,.nav a:focus-visible{color:var(--fg)}
+
+/* hero */
+.hero{padding-block:56px 40px;border-bottom:1px solid var(--line)}
+.hero .wrap{display:grid;grid-template-columns:1.25fr 1fr;gap:40px;align-items:end}
+.hero h1{font-size:clamp(40px,6.4vw,78px);font-weight:800;font-stretch:72%;letter-spacing:-.015em;line-height:.95;margin-block:12px 18px}
+.hero h1 span{color:var(--accent)}
+.ticket{border:1.5px solid var(--fg);background:var(--surface);font-family:var(--mono);font-size:13px}
+.ticket .row{display:flex;justify-content:space-between;gap:12px;padding:9px 14px;border-bottom:1px dashed var(--line)}
+.ticket .row:last-child{border-bottom:0}
+.ticket .row b{font-weight:500;text-align:right}
+.ticket .hd{background:var(--fg);color:var(--bg);padding:8px 14px;display:flex;justify-content:space-between;letter-spacing:.06em}
+.barcode{height:34px;margin:10px 14px 12px;background:repeating-linear-gradient(90deg,var(--fg) 0 2px,transparent 2px 4px,var(--fg) 4px 5px,transparent 5px 9px,var(--fg) 9px 12px,transparent 12px 13px)}
+
+section.block{padding-block:56px}
+section.block+section.block{border-top:1px solid var(--line)}
+.sec-head{display:grid;gap:10px;margin-bottom:28px}
+
+/* diagnóstico */
+.diag{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}
+.diag div{background:var(--surface);padding:18px;display:grid;gap:6px;align-content:start}
+.diag .big{font-family:var(--display);font-size:34px;font-weight:750;font-stretch:80%}
+.diag small{color:var(--muted);font-size:13px}
+.findings{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:28px}
+.findings ul{margin:0;padding:0;list-style:none;display:grid;gap:10px}
+.findings li{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:3px;white-space:nowrap}
+.tag.gap{background:var(--accent-soft);color:var(--accent)}
+.tag.opp{background:var(--teal-soft);color:var(--teal)}
+
+/* arquitectura */
+.arch{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1.5px solid var(--fg);background:var(--surface)}
+.arch>div{padding:16px;border-right:1px solid var(--line);display:grid;gap:8px;align-content:start;position:relative;min-width:0}
+.arch>div:last-child{border-right:0}
+.arch>div:not(:last-child)::after{content:"";position:absolute;right:-7px;top:22px;width:12px;height:12px;background:var(--surface);border-top:1.5px solid var(--accent);border-right:1.5px solid var(--accent);transform:rotate(45deg);z-index:1}
+.arch .layer{font-family:var(--mono);font-size:11px;color:var(--accent);letter-spacing:.06em;text-transform:uppercase}
+.arch ul{margin:0;padding-left:16px;color:var(--muted);font-size:13.5px;display:grid;gap:3px}
+
+/* módulos */
+.mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.mod{background:var(--surface);border:1px solid var(--line);padding:18px;display:grid;gap:10px;align-content:start}
+.mod .code{font-family:var(--mono);font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+.mod .who{color:var(--teal)}
+.mod p{color:var(--muted);font-size:14px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:12px;padding:2px 8px;border:1px solid var(--line);border-radius:99px;background:var(--sunk)}
+.mod .feeds{font-size:12.5px;color:var(--fg);border-top:1px dashed var(--line);padding-top:8px}
+.mod .feeds b{font-family:var(--mono);font-weight:500;color:var(--accent);font-size:11px;letter-spacing:.05em;margin-right:4px}
+
+/* KPI catálogo */
+.seg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.seg button{font:inherit;font-size:13px;padding:6px 12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:99px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.seg button:focus-visible,.nav a:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.tbl-wrap{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13.5px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--mono);font-weight:500;font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);background:var(--sunk);position:sticky;top:0}
+td.f{font-family:var(--mono);font-size:12.5px;color:var(--muted);min-width:230px}
+td .persp{font-size:11px;font-family:var(--mono);color:var(--teal)}
+tr:last-child td{border-bottom:0}
+
+/* demo */
+.demo{background:var(--sunk);border-block:1px solid var(--line);padding-block:40px 48px}
+.demo-top{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:end;justify-content:space-between;margin-bottom:16px}
+.sample{font-family:var(--mono);font-size:11.5px;background:var(--accent-soft);color:var(--accent);padding:3px 8px;border-radius:3px;letter-spacing:.04em}
+.filters{display:flex;flex-wrap:wrap;gap:10px}
+.filters label{display:grid;gap:3px;font-size:11px;font-family:var(--mono);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+select{font:inherit;font-size:13.5px;padding:7px 10px;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:6px;min-width:140px}
+.tiles{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:12px}
+.tile{background:var(--surface);border:1px solid var(--line);padding:12px 12px 8px;display:grid;gap:2px;min-width:0}
+.tile .k{font-size:12px;color:var(--muted)}
+.tile .v{font-family:var(--display);font-size:28px;font-weight:700;font-stretch:82%;font-variant-numeric:tabular-nums;line-height:1.1}
+.tile .d{font-family:var(--mono);font-size:11.5px}
+.tile svg{width:100%;height:30px;display:block}
+.up{color:var(--good)} .down{color:var(--crit)} .flat{color:var(--muted)}
+.grid{display:grid;grid-template-columns:1.7fr 1fr;gap:12px}
+.panel{background:var(--surface);border:1px solid var(--line);padding:14px;min-width:0;display:grid;gap:10px;align-content:start}
+.panel-h{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.panel-h h3{font-size:15px}
+.panel-h .sub{font-size:12px;color:var(--muted)}
+.mapbox{position:relative}
+.mapbox svg{width:100%;height:auto;display:block}
+.st{stroke:var(--surface);stroke-width:.8;cursor:pointer;transition:opacity .15s}
+.st.nc{fill:var(--nocov);cursor:default}
+.st.dim{opacity:.28}
+.st.sel{stroke:var(--fg);stroke-width:2}
+.st:not(.nc):hover{stroke:var(--fg);stroke-width:1.4}
+.flow{fill:none;stroke:var(--accent);stroke-linecap:round;opacity:.75}
+.flow.anim{stroke-dasharray:4 6;animation:dash 1.4s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-20}}
+@media (prefers-reduced-motion:reduce){.flow.anim{animation:none}}
+.hub{fill:var(--surface);stroke:var(--accent);stroke-width:2}
+.hub.main{fill:var(--accent)}
+.maplbl{font-family:var(--mono);font-size:10px;fill:var(--muted);pointer-events:none}
+.legend{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.ramp{display:flex}
+.ramp i{width:26px;height:10px;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--fg);color:var(--bg);font-size:12px;padding:7px 9px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-115%);font-variant-numeric:tabular-nums}
+.toggle{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex-wrap:wrap}
+.toggle button{font:inherit;font-size:12px;padding:5px 9px;border:0;background:var(--surface);color:var(--muted);cursor:pointer}
+.toggle button[aria-pressed="true"]{background:var(--teal);color:var(--surface)}
+.rank{display:grid;gap:5px;font-size:13px}
+.rank .r{display:grid;grid-template-columns:96px 1fr 58px;gap:8px;align-items:center;cursor:pointer;padding:2px 0}
+.rank .r .bar{height:8px;background:var(--sunk);border-radius:2px;overflow:hidden}
+.rank .r .bar i{display:block;height:100%;background:var(--teal)}
+.rank .r span:last-child{text-align:right;font-family:var(--mono);font-size:12px}
+.detail{border-top:1px dashed var(--line);padding-top:10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.detail div{display:grid}
+.detail small{font-size:11px;color:var(--muted)}
+.detail b{font-family:var(--mono);font-weight:500;font-size:14px}
+.alerts{display:grid;gap:8px}
+.alert{display:grid;grid-template-columns:4px 1fr;gap:10px;font-size:13px}
+.alert::before{content:"";border-radius:2px;background:var(--sev)}
+.alert .t{color:var(--muted);font-size:12px}
+.alert .act{font-family:var(--mono);font-size:11.5px;color:var(--teal)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px}
+.chart svg{width:100%;height:auto;display:block}
+.axis{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+.gridl{stroke:var(--line);stroke-width:1}
+.hex{stroke:var(--surface);stroke-width:.6}
+.foot-note{font-size:12px;color:var(--muted)}
+
+/* decisiones */
+.cadence{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:28px}
+.cad{border-top:3px solid var(--fg);padding-top:12px;display:grid;gap:6px}
+.cad .when{font-family:var(--mono);font-size:12px;color:var(--accent)}
+.cad p{color:var(--muted);font-size:14px}
+.sev{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;vertical-align:middle}
+
+/* roadmap */
+.road{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border-top:1.5px solid var(--fg)}
+.phase{padding:16px 16px 0 0;display:grid;gap:8px;align-content:start;position:relative}
+.phase::before{content:"";position:absolute;top:-7px;left:0;width:12px;height:12px;background:var(--accent);transform:rotate(45deg)}
+.phase .wk{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.phase ul{margin:0;padding-left:16px;font-size:14px;color:var(--muted);display:grid;gap:3px}
+.phase .out{font-size:13px;border-left:2px solid var(--teal);padding-left:8px}
+.stack{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;margin-top:32px}
+.stack div{border:1px solid var(--line);background:var(--surface);padding:14px;display:grid;gap:4px}
+.stack small{font-family:var(--mono);font-size:11px;color:var(--teal);text-transform:uppercase;letter-spacing:.05em}
+.stack p{font-size:13.5px;color:var(--muted)}
+footer{padding-block:28px 40px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted)}
+footer .wrap{display:grid;gap:6px}
+footer a{color:var(--teal)}
+
+@media (max-width:980px){
+  .hero .wrap,.grid,.findings{grid-template-columns:1fr}
+  .tiles{grid-template-columns:repeat(3,1fr)}
+  .grid3,.cadence{grid-template-columns:1fr}
+  .arch{grid-template-columns:1fr}
+  .arch>div{border-right:0;border-bottom:1px solid var(--line)}
+  .arch>div:not(:last-child)::after{right:24px;top:auto;bottom:-7px;transform:rotate(135deg)}
+  .road{grid-template-columns:1fr 1fr;row-gap:24px}
+  .diag{grid-template-columns:1fr 1fr}
+  .diag div:first-child{grid-column:1/-1}
+}
+@media (max-width:560px){
+  .tiles{grid-template-columns:1fr 1fr}
+  .road{grid-template-columns:1fr}
+  .detail{grid-template-columns:1fr 1fr}
+  select{min-width:0;width:100%}
+  .filters{display:grid;grid-template-columns:1fr 1fr;width:100%}
+}
+</style>
+</head>
+<body>
+
+
+<nav class="nav" aria-label="Secciones">
+  <div class="wrap">
+    <span class="brand"><i></i>TORRE DE CONTROL BETA</span>
+    <a href="#diagnostico">Diagnóstico</a>
+    <a href="#arquitectura">Arquitectura</a>
+    <a href="#modulos">Módulos de captura</a>
+    <a href="#indicadores">Indicadores</a>
+    <a href="#demo">Tablero demo</a>
+    <a href="#decisiones">Decisiones</a>
+    <a href="#ruta">Hoja de ruta</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <p class="eyebrow">Propuesta · Servicio Integral BETA · Última milla</p>
+      <h1>Cada entrega, <span>medida</span>. Cada decisión, con datos.</h1>
+      <p class="lede">Un sistema de indicadores de control para una operación de última milla con presencia en 24 entidades: captura en campo, tableros por rol, mapas operativos y reglas de decisión que convierten las cifras en acciones del día.</p>
+    </div>
+    <div class="ticket" aria-label="Ficha de la propuesta">
+      <div class="hd"><span>GUÍA DE PROPUESTA</span><span>BETA-TC-01</span></div>
+      <div class="row"><span>Cliente</span><b>Servicio Integral BETA</b></div>
+      <div class="row"><span>Origen</span><b>Patriotismo 229, CDMX</b></div>
+      <div class="row"><span>En operación desde</span><b>2010 · 16 años</b></div>
+      <div class="row"><span>Destino</span><b>24 entidades</b></div>
+      <div class="row"><span>Contenido</span><b>8 módulos · 28 KPIs · 3 mapas</b></div>
+      <div class="row"><span>Fecha</span><b>6 nov 2026</b></div>
+      <div class="row"><span>Preparó</span><b>Rubén Parra</b></div>
+      <div class="barcode" aria-hidden="true"></div>
+    </div>
+  </div>
+</header>
+
+<main>
+<section class="block" id="diagnostico">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">01 · Diagnóstico de la empresa</p>
+      <h2>16 años de operación nacional que todavía no se ven en datos</h2>
+      <p class="lede">Servicio Integral BETA (también Transporte Integral BETA o BETA Last Mile) opera desde 2010, con oficinas en Av. Patriotismo 229, Benito Juárez, CDMX. Entrega al consumidor final para supermercados, comercio electrónico y centros comerciales, bajo el lema «Tú lo vendes, nosotros lo entregamos». Su sitio comunica escala (cobertura y kilómetros), pero no expone rastreo, portal de clientes ni indicadores de servicio. Ahí está la oportunidad.</p>
+    </div>
+    <div class="diag">
+      <div><span class="big num">24</span><small>Entidades con cobertura publicada (23 estados + CDMX), de norte a sureste.</small></div>
+      <div><span class="big num">144,000</span><small>Kilómetros por día que se infieren de sus contadores (4.32 M al mes, 51.84 M al año).</small></div>
+      <div><span class="big num">4</span><small>Tipos de vehículo: moto, sedán, small van y large van.</small></div>
+      <div><span class="big num">3</span><small>Segmentos de aliados: supermercados, e-commerce y centros comerciales, cada uno con SLA distinto.</small></div>
+      <div><span class="big num">0</span><small>Herramientas digitales visibles para el cliente: sin rastreo, portal ni métricas de servicio.</small></div>
+    </div>
+    <div class="findings">
+      <div>
+        <h3 style="margin-bottom:12px">Brechas detectadas</h3>
+        <ul>
+          <li><span class="tag gap">Brecha</span><span>«Atención a clientes» no tiene contenido: no hay rastreo de guía ni acceso para clientes.</span></li>
+          <li><span class="tag gap">Brecha</span><span>Los contadores de kilómetros tienen las etiquetas desfasadas (el valor diario aparece sin periodo y el anual queda vacío). Señal de que las cifras no se alimentan de un sistema.</span></li>
+          <li><span class="tag gap">Brecha</span><span>Servicios solo lista tipos de vehículo; no hay niveles de servicio (mismo día, día siguiente, ventanas, contra entrega).</span></li>
+          <li><span class="tag gap">Brecha</span><span>Talento es un formulario genérico: sin visibilidad del ciclo de reclutamiento de operadores, que en última milla es el cuello de botella.</span></li>
+        </ul>
+      </div>
+      <div>
+        <h3 style="margin-bottom:12px">Oportunidades</h3>
+        <ul>
+          <li><span class="tag opp">Oportunidad</span><span>Convertir los 144,000 km diarios en costo por entrega y productividad por ruta medidos, no estimados.</span></li>
+          <li><span class="tag opp">Oportunidad</span><span>Supermercados exigen ventanas cortas y perecederos en buen estado; e-commerce, primer intento y rastreo; centros comerciales, consolidación y horario de andén. Un tablero por segmento hace visible ese SLA diferenciado.</span></li>
+          <li><span class="tag opp">Oportunidad</span><span>Su propuesta de valor es cuidar «a los clientes de sus clientes»: eso se demuestra con OTIF, primer intento y satisfacción del destinatario.</span></li>
+          <li><span class="tag opp">Oportunidad</span><span>Un portal con SLA en vivo diferencia a BETA ante los supermercados, tiendas en línea y centros comerciales que le confían sus envíos.</span></li>
+          <li><span class="tag opp">Oportunidad</span><span>8 estados del centro sin cobertura (Puebla, Querétaro, Hidalgo, SLP, entre otros) quedan a 1–3 h de CDMX: expansión medible con los mismos datos.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="arquitectura">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">02 · Arquitectura del sistema</p>
+      <h2>Del escaneo en campo a la decisión en la mesa directiva</h2>
+      <p class="lede">Cinco capas. Cada dato se captura una sola vez, en el lugar donde ocurre, y se reutiliza en todos los tableros.</p>
+    </div>
+    <div class="arch">
+      <div><span class="layer">Capa 1 · Captura</span><h3>Apps y estaciones</h3><ul><li>App de operador (Android)</li><li>Escáner en CEDIS</li><li>Consola de despacho</li><li>Formularios de incidencia</li></ul></div>
+      <div><span class="layer">Capa 2 · Integración</span><h3>Conectores</h3><ul><li>API/EDI de clientes y marketplaces</li><li>GPS y telemetría de flota</li><li>WhatsApp al destinatario</li><li>ERP / nómina</li></ul></div>
+      <div><span class="layer">Capa 3 · Datos</span><h3>Almacén único</h3><ul><li>Modelo envío → parada → ruta</li><li>Geodatos con PostGIS + celdas H3</li><li>Historial por evento</li><li>Calidad y auditoría</li></ul></div>
+      <div><span class="layer">Capa 4 · Analítica</span><h3>Motor de KPIs</h3><ul><li>Cálculo cada 15 min</li><li>Umbrales y alertas</li><li>Pronóstico de volumen</li><li>Score de riesgo por envío</li></ul></div>
+      <div><span class="layer">Capa 5 · Consumo</span><h3>Tableros por rol</h3><ul><li>Torre de control nacional</li><li>Gerente de plaza</li><li>Portal del cliente</li><li>Dirección (mensual)</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="modulos">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">03 · Módulos de captura de datos</p>
+      <h2>Ocho módulos que alimentan todos los indicadores</h2>
+      <p class="lede">Cada módulo indica quién captura, qué registra y qué indicadores alimenta. La regla de diseño es que capturar tome menos de 10 segundos por evento en campo.</p>
+    </div>
+    <div class="mods" id="mods"></div>
+  </div>
+</section>
+
+<section class="block" id="indicadores">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">04 · Catálogo de indicadores</p>
+      <h2>28 KPIs en seis perspectivas</h2>
+      <p class="lede">Cada indicador tiene fórmula, meta inicial sugerida, frecuencia y dueño. Las metas son puntos de partida de la industria; se recalibran con los primeros 60 días de datos reales de BETA.</p>
+    </div>
+    <div class="seg" id="kpiSeg" role="group" aria-label="Filtrar por perspectiva"></div>
+    <div class="tbl-wrap"><table><thead><tr><th>Indicador</th><th>Fórmula</th><th>Meta</th><th>Frecuencia</th><th>Dueño</th></tr></thead><tbody id="kpiBody"></tbody></table></div>
+  </div>
+</section>
+
+<section class="demo" id="demo">
+  <div class="wrap">
+    <div class="demo-top">
+      <div class="sec-head" style="margin:0">
+        <p class="eyebrow">05 · Tablero demo · Torre de control nacional</p>
+        <h2>Así se vería un día de operación</h2>
+        <p><span class="sample">DATOS DE EJEMPLO · NO SON CIFRAS DE BETA</span></p>
+      </div>
+      <div class="filters">
+        <label for="fPer">Periodo<select id="fPer"><option value="1">Hoy</option><option value="7" selected>Últimos 7 días</option><option value="30">Últimos 30 días</option></select></label>
+        <label for="fReg">Región<select id="fReg"><option value="all">Nacional</option><option value="N">Norte</option><option value="C">Centro-Bajío</option><option value="S">Sur-Sureste</option></select></label>
+        <label for="fVeh">Vehículo<select id="fVeh"><option value="all">Todos</option><option value="moto">Moto</option><option value="sedan">Sedán</option><option value="svan">Small van</option><option value="lvan">Large van</option></select></label>
+      </div>
+    </div>
+
+    <div class="tiles" id="tiles"></div>
+
+    <div class="grid">
+      <div class="panel">
+        <div class="panel-h">
+          <div><h3>Mapa nacional de desempeño</h3><span class="sub">Toca un estado para ver su detalle. Gris: sin cobertura.</span></div>
+          <div class="toggle" id="metricT" role="group" aria-label="Métrica del mapa"></div>
+        </div>
+        <div class="mapbox" id="mapbox"><svg id="map" role="img" aria-label="Mapa de México por estado"></svg><div class="tip" id="tip" hidden></div></div>
+        <div class="panel-h">
+          <div class="legend" id="legend"></div>
+          <label class="legend" style="cursor:pointer"><input type="checkbox" id="flows" checked> Flujos troncales desde CDMX</label>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3 id="rankTitle">Ranking por estado</h3><span class="sub" id="rankSub"></span></div>
+        <div class="rank" id="rank"></div>
+        <div id="detailWrap" hidden>
+          <div class="panel-h"><h3 id="dTitle"></h3><button class="sub" id="dClose" style="font:inherit;font-size:12px;background:none;border:0;color:var(--teal);cursor:pointer">Ver nacional</button></div>
+          <div class="detail" id="detail"></div>
+        </div>
+        <div class="panel-h" style="margin-top:6px"><h3>Alertas activas</h3><span class="sub">Regla → acción sugerida</span></div>
+        <div class="alerts" id="alerts"></div>
+      </div>
+    </div>
+
+    <div class="grid3">
+      <div class="panel chart"><div class="panel-h"><h3>OTIF diario vs meta</h3><span class="sub">30 días</span></div><svg id="cTrend" viewBox="0 0 320 160"></svg></div>
+      <div class="panel chart"><div class="panel-h"><h3>Curva de entregas por hora</h3><span class="sub">Promedio del periodo</span></div><svg id="cHour" viewBox="0 0 320 160"></svg></div>
+      <div class="panel chart"><div class="panel-h"><h3>Costo por entrega por vehículo</h3><span class="sub">MXN vs tarifa promedio</span></div><svg id="cVeh" viewBox="0 0 320 160"></svg></div>
+    </div>
+
+    <div class="grid" style="margin-top:12px">
+      <div class="panel">
+        <div class="panel-h">
+          <div><h3>Mapa de calor urbano · Valle de México</h3><span class="sub">Celdas hexagonales (H3 resolución 8, aprox. 0.7 km²)</span></div>
+          <div class="toggle" id="hexT" role="group" aria-label="Capa del mapa urbano"></div>
+        </div>
+        <div class="chart"><svg id="hexmap" viewBox="0 0 640 330" role="img" aria-label="Mapa de calor hexagonal"></svg></div>
+        <div class="legend" id="hexLegend"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>Aliados · cumplimiento de SLA</h3><span class="sub">Top 6 por volumen · por segmento</span></div>
+        <div class="tbl-wrap" style="border:0"><table id="clients"></table></div>
+        <p class="foot-note">El mismo dato se publica a cada cliente en su portal, filtrado a sus envíos.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="decisiones">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">06 · Del indicador a la decisión</p>
+      <h2>Ritmo de gestión y reglas de acción</h2>
+      <p class="lede">Un tablero sin rutina de revisión se vuelve decoración. Proponemos tres ciclos y un libro de reglas: cuando un indicador cruza su umbral, el sistema genera la alerta, propone la acción y registra quién la tomó.</p>
+    </div>
+    <div class="cadence">
+      <div class="cad"><span class="when">Diario · 7:30 y 15:00 · 15 min</span><h3>Junta de torre de control</h3><p>Volumen del día vs capacidad, rutas en riesgo, ausentismo de operadores, rezago del día anterior. Decide reasignaciones y apoyos entre plazas.</p></div>
+      <div class="cad"><span class="when">Semanal · lunes · 45 min</span><h3>Revisión operativa por plaza</h3><p>OTIF, primer intento, costo por entrega, incidencias y rotación por gerente de plaza. Decide re-sectorización, contrataciones y mezcla de vehículos.</p></div>
+      <div class="cad"><span class="when">Mensual · 90 min</span><h3>Comité de dirección</h3><p>Margen por cliente y por estado, SLA contractual, NPS del destinatario, expansión. Decide tarifas, renegociaciones, inversión en flota y nuevas plazas.</p></div>
+    </div>
+    <div class="tbl-wrap"><table><thead><tr><th>Indicador y umbral</th><th>Decisión sugerida</th><th>Responsable</th><th>Plazo</th></tr></thead><tbody id="rules"></tbody></table></div>
+  </div>
+</section>
+
+<section class="block" id="ruta">
+  <div class="wrap">
+    <div class="sec-head">
+      <p class="eyebrow">07 · Hoja de ruta</p>
+      <h2>Cuatro fases, valor desde la semana 6</h2>
+      <p class="lede">Se arranca con una plaza piloto (CDMX y Estado de México concentran la mayor densidad) y se replica al resto con el mismo modelo.</p>
+    </div>
+    <div class="road">
+      <div class="phase"><span class="wk">Fase 1 · semanas 1–6</span><h3>Cimientos de datos</h3><ul><li>Modelo de datos y catálogos</li><li>App de operador con prueba de entrega</li><li>Escaneo en CEDIS piloto</li></ul><p class="out">Resultado: OTIF y primer intento medidos en la plaza piloto.</p></div>
+      <div class="phase"><span class="wk">Fase 2 · semanas 7–12</span><h3>Torre de control</h3><ul><li>Tableros nacional y de plaza</li><li>Mapas y alertas</li><li>Telemetría GPS integrada</li></ul><p class="out">Resultado: junta diaria operando con datos del sistema.</p></div>
+      <div class="phase"><span class="wk">Fase 3 · semanas 13–18</span><h3>Portal y despliegue</h3><ul><li>Rastreo y portal de clientes</li><li>Notificación WhatsApp y encuesta</li><li>Réplica a las 24 entidades</li></ul><p class="out">Resultado: cada cliente ve su SLA en vivo.</p></div>
+      <div class="phase"><span class="wk">Fase 4 · semana 19 en adelante</span><h3>Analítica avanzada</h3><ul><li>Pronóstico de volumen por plaza</li><li>Score de riesgo de entrega fallida</li><li>Rentabilidad por cliente y ruta</li></ul><p class="out">Resultado: decisiones anticipadas, no reactivas.</p></div>
+    </div>
+    <div class="stack">
+      <div><small>Apps de campo</small><h3>Flutter o React Native</h3><p>Modo sin conexión, escaneo con cámara, foto, firma y geocerca.</p></div>
+      <div><small>Datos</small><h3>PostgreSQL + PostGIS</h3><p>Un solo modelo para envíos, rutas y geografía; celdas H3 para mapas de calor.</p></div>
+      <div><small>Mapas</small><h3>MapLibre + teselas vectoriales</h3><p>Mapas propios sin costo por consulta, con capas de rutas y zonas.</p></div>
+      <div><small>Tableros</small><h3>Web a la medida o Power BI</h3><p>A la medida para la torre de control y portal; BI para análisis ad hoc de dirección.</p></div>
+    </div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Servicio Integral BETA · Av. Patriotismo 229, Piso 9A, Col. San Pedro de los Pinos, Benito Juárez, 03800, CDMX · 55 4318 3635 · recepcion.beta@betalastmile.com</p>
+    <p>Fuentes del diagnóstico: información de la empresa recopilada por el autor (fundación, oficinas, aliados) y sitio público <a href="https://betalastmile.com" target="_blank" rel="noopener">betalastmile.com</a> (Inicio, Quiénes somos, Servicios, Atención a clientes, Talento), consultado el 6 de noviembre de 2026.</p>
+    <p>Todas las cifras del tablero demo son simuladas para ilustrar el sistema. Las metas de los KPIs son referencias iniciales a validar con BETA.</p>
+  </div>
+</footer>
+
+<script>
+const MAP = {"W":1000,"H":629,"states":{"bc":{"n":"Baja California","d":"M93.8,160.1L93.6,162.5L90.1,159.8L88.4,160.1L92.5,155.1L93.7,150.2L94.9,154.4L93.8,160.1ZM3.3,121.8L1.5,122.4L0,116L0.3,113.2L3.9,116.7L3.3,121.8ZM123.5,166L126,163.2L125.3,166.2L123.5,166ZM126.8,166.3L126.6,165.2L127.6,166.4L126.8,166.3ZM119.3,8.6L115.4,9.5L112,15.7L114,20.6L113.8,28.8L116.6,33.2L117.5,37.9L114.9,42.2L112.6,54.7L114.5,58.8L113.8,60.3L117,62.9L116.6,73.4L118,80.9L116.3,89.2L119.4,97.1L122.4,99.4L123.1,103.8L128.6,105.6L133,111.2L140.8,118.3L144.9,124.1L143.8,125.2L146.9,131.2L146.8,136.8L149.8,134.7L151.8,140.4L154.7,139.2L156.5,142.7L158.7,151.2L161.7,153.1L166.4,153.9L165.2,159.3L167.6,162.5L166.6,165.1L167.8,169.4L127.9,166.4L126.7,162L128.7,159.3L126.7,157.3L129.9,150.5L126.6,143.7L123.4,143L118,133.1L114.6,131.6L113.7,127L111.1,126L104.3,116.2L98,113.9L95.3,110L90.6,106.5L89.1,106.6L83.6,101L84,96.1L80.9,93.7L82.2,89.1L81.5,80.1L75.6,74.8L76.9,66.2L76.2,63.2L73.2,61.2L71.3,57.6L68.8,57.4L70.2,50.8L69.6,48.2L64.8,39.9L60.9,35.6L62.1,32L59.5,28.4L62,29.7L63.8,25.2L60,22.9L57.7,19.9L55.7,10.5L53.5,9.2L51.5,2.7L51.6,0L122.8,1.5L120,5.3L119.3,8.6ZM152.8,127.6L146.4,118.8L147.2,114L149,114.1L153.5,120.2L152.6,122.8L158.2,123.9L159.5,134.6L152.8,127.6Z"},"bs":{"n":"Baja California Sur","d":"M253,306.8L251,307.1L249.9,305.3L249,299.2L253,306.8ZM185,291.1L188.4,291.2L193.5,296.6L192.9,299.1L185,291.1ZM235.9,292.6L238,295.4L236.7,297.7L234.1,291.8L235.9,292.6ZM229.2,275.5L231.2,280.9L227.2,278.4L225.4,275.5L229.2,275.5ZM179.9,274.6L177.5,281.3L175,281L178.5,273.5L181.2,265L181.7,266.5L179.4,272.5L179.9,274.6ZM216.5,239.1L210.7,247.4L211.4,243.8L212.7,239.8L216.5,239.1ZM123.5,166L125.3,166.2L126.5,168.8L126.8,166.3L167.8,169.4L167.2,174L172.1,181.7L178.8,185.2L181,192.3L183.6,196.4L182.9,197.7L186.6,200.6L190.8,202.3L188.5,206.1L192.7,211.6L191.4,214.7L194.8,220.6L198.2,220.5L194.2,215.6L193.5,209.8L194.5,209.3L202,216.7L201.6,220.8L205.3,223L204.5,227.1L206.5,229.6L206.3,232.3L208.4,238.5L206.9,242.3L208.2,248.8L211,251.6L213.7,257.8L216.7,258.3L216.4,260.6L219.6,271.3L224.1,276L226.9,283.2L224.6,287.5L223.9,291.8L225.4,298.6L228.9,303.9L235.5,307.6L237.2,304.1L236.1,300.6L239.5,299.8L241.3,303L246.4,306.5L246.8,310.3L251.9,310L251.9,315.2L255.7,319.3L256,324.4L262.4,327.7L263.9,331.2L263.7,336.8L260.1,343.2L254.2,345.6L248.2,350.8L246.4,350.8L241.9,345.6L240.2,335.1L236,327.4L227.6,322.1L213.6,306.9L200.6,298.2L196,293.3L194.3,289.2L193.6,291L190.3,290.4L189.1,286.6L185.6,282.1L181.8,282.1L180.2,278.5L181.2,268.2L183,265.3L183.6,258.5L182.7,258.3L183.2,249.1L180.8,239.7L178,237.6L176.7,233.1L173.7,230L172,230.9L155.3,217.1L155.6,215.4L152.5,210.3L153.5,204.1L148.7,211.4L146.4,209.7L142,209.4L140.6,211.9L137.7,211.4L135.1,208.7L132.7,203.3L128.4,201.3L126.9,201.8L123.9,197.1L120.3,195.2L118.4,196L112.7,191.7L112.6,185.8L110,183.1L105.9,181.2L102.7,175.4L101.2,175.9L97.3,172.2L97,168.6L110.7,172.8L113.9,173.1L119.5,170L120.5,174.9L124.3,177.6L125.6,180L127.6,177.9L130.4,178.5L131.6,176.4L128.4,175.1L125.9,176.4L124.1,172.1L124.6,167.8L121.4,169.8L123.5,166Z"},"so":{"n":"Sonora","d":"M184,145.3L175.5,139.5L178.6,136.4L178.4,132.7L180.6,128.6L185.4,128L185.4,131.1L187.6,135.3L184,145.3ZM121,35.9L119.5,36.8L117.3,34.4L118.7,33.1L121,35.9ZM296.6,217.3L276.5,232.7L273,232.1L273.1,226.9L265,217.9L264.8,220.2L260.7,220.4L257.5,219.1L254.9,215.8L251.9,207L242.2,203.1L238.8,199.6L234.9,197.6L238.2,197.7L233.5,192.4L232.5,186.8L234.1,184.8L233.3,179.8L236.2,178.8L227.6,175.5L226.4,173.4L225,178.4L221.8,173.9L219.9,174.7L214.3,170.5L208.1,158.7L201.1,155.6L199.8,151.2L194.5,144.9L195.3,143.4L192.2,141.1L188.8,136.5L188.7,132.3L187,129.4L186.9,125.1L184.1,125.5L181.6,122.6L183,119.6L174.8,103.6L173,102.9L173.5,93.9L170.6,90.8L170.7,85.3L167.5,81.4L165.1,76.4L164,71.4L167.4,59.7L162.2,56.2L152.9,53.6L151.2,51.5L150.2,46.5L147,43.9L142.2,42.1L139.3,45.7L135.4,45.3L126.1,38L123.7,34.8L120.9,34.5L113.8,28.8L114,20.6L112,15.7L115.4,9.5L119.3,8.6L226.5,57.7L288.5,61.1L285.5,78.2L292.5,85.2L295.6,86.5L298.8,89.9L299.5,106L296.5,127.6L293.6,127.7L295.4,149.5L294.5,155L297.3,165.1L294.2,167.7L287,165.7L281.2,166L278.7,169.3L282.2,178.7L285.6,181.3L286.5,184.1L289.8,187L289.2,188.8L292.9,192.8L293.2,199.5L291.8,204L294.8,208.9L298.1,211.2L296.6,217.3ZM271.6,235.9L272.6,233.5L271.9,235.8L271.6,235.9ZM273.5,235L273.8,232.5L275.9,233.5L273.5,235Z"},"cl":{"n":"Colima","d":"M209.5,492.4L204.9,490.8L207.2,487.5L210,491.2L209.5,492.4ZM444.5,497.6L436.8,491.3L425.3,486.3L426.2,484.2L416.8,481.9L418.6,478.5L420.6,479.2L429,476L432.1,470.9L434.4,469.8L441.5,473.4L447.9,470.3L449,473L452.4,476.1L451.5,483.8L453.1,488.1L448.9,490.7L448.3,493.7L444.5,497.6Z"},"na":{"n":"Nayarit","d":"M351.2,394L354.7,395.4L354.2,398.7L351.5,397.3L351.2,394ZM425.9,373.2L423.1,381.2L432.7,391.5L430.8,398L429.1,400.6L437.7,405.5L436.5,409.1L433.3,411.4L428.8,412.6L429.1,419.4L427.2,423.2L426.7,428.5L420.6,423.8L419.1,421.7L415.9,421.1L412.5,418.1L410.2,417.8L406.2,420.7L400.6,421.2L394.3,429.1L392.1,426.5L388.3,426.8L389,422.9L393.7,417.3L396.2,416.3L396.8,411.3L395.9,406.6L397.4,401.5L390.5,397.7L383.7,385.5L382.9,382.4L383,375.2L380.9,366.5L384.4,365.2L389.1,367L389.9,365.2L388.5,360.6L385.8,356.9L389.7,353.1L389,350.2L391.7,348.6L399.9,349.2L405.7,352.7L407.6,357.1L404.1,360.9L404.9,365.5L411.2,360.9L414.6,362.7L417.1,368.4L420.6,369.9L425.2,367.8L425.9,373.2Z"},"cm":{"n":"Campeche","d":"M846.4,479.7L842,482.7L836.7,483.7L845.3,478.9L846.4,479.7ZM928.4,502.1L928.3,507L867.6,511.6L866.6,512.2L866.3,506.4L862.3,506.5L855.1,504L846.5,503L844.8,508.5L837.2,508.9L833.5,507.2L826.8,502.1L826.3,491.8L819.4,492.4L817.3,491L814.8,486L828.7,483.2L832.4,483.4L835.6,486L830.6,486.3L838,490L844.9,491.2L847.6,488.6L853.3,486L855.1,480.2L849.9,477.3L849.2,475.5L865,464.3L871.2,456.3L871,445.3L872.2,441.9L878,436.5L876.9,431.4L876.7,419.4L875.8,415.1L876.5,407.6L878.4,404.6L879,414.4L884.2,415.2L886.7,418L890.2,418.2L891.5,416L894.5,420.9L897.1,422.6L899.4,427L905.8,430.7L908.7,435L912.4,438.6L915.8,444.9L924.3,450.8L928.9,457.1L929.3,463.6L927.5,466.3L927.4,475.9L931.3,492.9L927.9,499.3L928.4,502.1Z"},"qr":{"n":"Quintana Roo","d":"M1000,401.6L995,411.2L992.9,413.4L991.9,407.2L993.8,403L1000,401.6ZM970,371.4L971.7,372.4L980.2,372.4L982.5,371.1L983.2,367.8L978.6,368.3L982.9,365.7L987.6,367.1L990.6,371.1L993.9,371.2L995.2,379.2L997.9,380.4L995.7,385.8L994.7,391.9L989.1,400.9L984.1,406.1L978.2,417.5L978.3,428.8L972.8,436.2L970.3,436.5L970.3,438.9L973.2,440.4L973,442.6L976.4,440L980.6,440.1L981.1,442.2L974,447.2L973.5,452L975.1,452.5L977.2,448.9L980.1,448.5L977,459.5L975.9,468.8L974.1,472L973.5,481.8L972.1,484.4L971.7,489.5L970.5,485L967.7,481.1L962.8,479.5L964.7,472.5L962.9,466.1L959.9,470.4L955.9,480.5L948.9,481.3L945.4,490.5L942.9,492.8L941.9,497.3L937.6,503.6L931.5,500.1L928.4,502.1L927.9,499.3L931.3,492.9L927.4,475.9L927.5,466.3L929.3,463.6L928.9,457.1L924.3,450.8L915.8,444.9L914.2,442.9L915.2,436.9L920.6,435.6L925.3,432L930,431L936.4,425.6L944.8,421.1L946.7,416.8L950,414.9L953.3,410.4L958.2,410.8L961.8,408.7L968.8,402.1L972.3,390.7L970,385.3L971.2,378.5L970,371.4Z"},"mx":{"n":"México","d":"M610.9,483.2L608.9,485.2L605.4,485.1L604.5,482.7L600.5,481.3L601.1,480.2L599.4,472.8L594.7,464.9L590.5,472.3L588.8,472.3L588.2,476.5L589.9,479.8L588.4,483.7L589.4,486.9L584.1,491.7L583.4,496L580.8,495.8L578,493.2L574,498.2L571.9,496.8L564.6,498.8L562.2,502.9L558.2,506.4L555.1,504.3L555.6,501.7L552.8,497.8L551.9,491.1L546.4,490.2L556.7,476.7L555.6,474.5L561.1,471L559.2,466.1L561.8,453.2L567.2,445L567.6,442.2L570.6,440.2L577.3,446.2L580.3,445.1L582.4,448.4L581.5,452.1L583.9,453.5L586,458.8L591.7,450.9L597.7,448.6L600.6,452.3L599.5,456.1L601.3,456.7L603.8,453.7L608.3,454.8L611.4,458.5L609.9,463.9L608.2,464.1L610.6,468.1L609.7,470.6L611.2,477.5L610.9,483.2Z"},"mo":{"n":"Morelos","d":"M600.5,481.3L604.5,482.7L605.4,485.1L608.9,485.2L610.9,483.2L610.7,487.8L608.3,490.6L610.4,494.9L607.8,494.7L610.6,503.8L606.2,501.6L598.4,506.8L593.4,499.8L591.9,503.4L589,503.5L586.4,501L583.4,496L584.1,491.7L589.4,486.9L588.4,483.7L589.9,479.8L597.9,482.5L600.5,481.3Z"},"df":{"n":"Distrito Federal","d":"M600.5,481.3L597.9,482.5L589.9,479.8L588.2,476.5L588.8,472.3L590.5,472.3L594.7,464.9L599.4,472.8L601.1,480.2L600.5,481.3Z"},"qt":{"n":"Querétaro","d":"M570.6,440.2L567.6,442.2L567.2,445L561.8,453.2L560.1,451.8L560,448.1L553.5,441.8L549.7,436.3L549.4,432.6L546.8,426L550,418.1L554.6,420.4L556.8,419.1L559.1,420.9L561.6,419.5L563,411.2L566,409.6L570.3,411L574.1,407.8L571.2,406.4L571.2,401.9L573.4,398.6L578.3,402.7L584.4,401.1L590,393.5L593.5,402.6L593.2,405.7L595.5,406.4L595.6,409.6L589.7,411.7L585.3,412.2L585.7,415L583.9,419.6L581.5,421.8L580.6,425.3L581.7,427.7L577.2,431.1L571.2,433.2L570.6,440.2Z"},"tb":{"n":"Tabasco","d":"M866.6,512.2L868,531.5L853.2,532.4L854.5,529.6L850.6,527L850.7,525.4L846,523.8L843.1,517L839.9,516.7L838.7,511.2L832.7,511L827.9,515.4L820.7,519.1L818.6,522.3L810.5,530.7L805.5,529.8L803,526.2L800.3,525.1L799.2,518.6L799.2,512.2L796.3,513.5L792.5,511L788.7,511.7L785.9,523.2L783,526.4L780.6,532.7L778.7,531.2L779.4,526.8L775.2,522.7L768.3,520L767,517.5L763.4,516L764.1,512.1L760.7,504.8L769.7,500.8L769.2,502.6L772.9,501.6L775.5,498.8L778.5,499L778.8,496.5L783.2,495.3L802.8,493.3L807.7,487.7L814.8,486L817.3,491L819.4,492.4L826.3,491.8L826.8,502.1L833.5,507.2L837.2,508.9L844.8,508.5L846.5,503L855.1,504L862.3,506.5L866.3,506.4L866.6,512.2Z"},"cs":{"n":"Chiapas","d":"M766.1,578L770.6,581.3L765.4,579.4L766.1,578ZM853.2,532.4L858.2,534.4L866.3,543.3L877.9,548.6L881.8,553.8L882,557.6L885.1,557.1L890.9,561.1L888.8,563.3L889.9,568.4L888,571.8L846.1,574.6L845.2,575.4L831.3,602.8L831.5,604.6L836.2,610L833.6,613L832.8,619.4L834,623.2L831.4,628.8L815.1,613.8L810,607.7L805.1,605.1L796.3,597.2L781.3,586.3L771.3,580.8L774.3,580.2L772.7,578L766.4,576.2L767.6,571.8L764.3,563.8L767,558.3L767,553.1L770.8,550.5L772,545.9L771.5,541.1L779.2,535.4L783,526.4L785.9,523.2L788.7,511.7L792.5,511L796.3,513.5L799.2,512.2L799.2,518.6L800.3,525.1L803,526.2L805.5,529.8L810.5,530.7L818.6,522.3L820.7,519.1L827.9,515.4L832.7,511L838.7,511.2L839.9,516.7L843.1,517L846,523.8L850.7,525.4L850.6,527L854.5,529.6L853.2,532.4Z"},"nl":{"n":"Nuevo León","d":"M563.5,183.6L566.5,186.9L560.6,190.5L560.8,193L564.8,193.5L568.2,205.3L566.9,210.2L567.8,213.5L572.2,215.5L569.6,220.8L572.2,220.6L577.1,222.6L578.1,224.4L577.1,228.1L578.1,231.4L579.9,230.3L582.5,233.7L585,234.1L586.5,241.8L590,240.4L594.3,244.4L596.6,241.2L604.1,243L605.4,260.9L608.8,262.6L595.6,274.8L590.9,273.9L586.4,278.3L587.3,285.9L583.1,284.2L577.4,287.5L575.4,290.8L572.2,291.2L569.6,293.5L570.5,296.9L573.7,295.4L574.9,301.2L573.8,308.3L574.7,310.8L578.9,314.4L574.7,321L567.2,322.2L563.9,329.7L565.5,334.8L561.1,333.5L558.5,335.7L560.8,337.1L560.8,339.6L552.3,339.4L551.9,341.6L548.8,340.4L547.6,333.9L548,330.6L546.5,325.5L546.6,320L543.6,316.3L542.4,304.2L535.2,294.7L536.9,288.4L535.9,283.4L537.9,281L534.6,278.4L536.5,274.7L540,272.4L544.1,271.7L548.7,272.8L552.4,272.2L554.3,269.8L551,267.5L546.3,267.7L542.5,265.3L539.4,261.5L542.4,262.5L539.6,258.7L537.6,258.5L533.5,252.8L533.4,247L531,245.5L530.6,242.8L527.3,240.3L525,235.9L521.7,233L535.6,220.3L537,224.1L540.6,219L541.5,209.8L537.7,207.6L536.5,210.3L533.8,209L533.6,203.8L538.9,199.6L544.7,197.7L546,190L547.6,186.5L552,183.2L558.7,188.3L563.5,183.6Z"},"si":{"n":"Sinaloa","d":"M271.9,235.8L271.9,238.5L273.5,235L275.9,233.5L277.2,236.8L276.5,232.7L296.6,217.3L297.9,210.9L301,207.9L304.6,209.3L306.4,211.8L311.7,213.7L312.3,217.3L317.1,224.9L318.2,237.1L319.1,238.8L329.8,241.3L331.9,242.9L334.4,250.4L344.2,258.4L340.2,263.1L339.1,265.9L338,273.8L340.6,283.1L343.8,287.4L346.2,287.7L349.2,290.8L353.4,298.4L354.1,302.3L356.9,305L360.1,305.2L364.2,301.8L366.6,301.8L371.2,305.5L374.3,312.7L377.1,313.1L375.3,317.3L375.8,325.1L378,330.1L381.5,333.7L382.3,339.4L386.6,344.1L391.6,344.6L391.7,348.6L389,350.2L389.7,353.1L385.8,356.9L388.5,360.6L389.9,365.2L389.1,367L384.4,365.2L380.9,366.5L378.5,362L374,357.1L371.2,355.4L365.3,347.6L358.7,341.5L355.9,335.4L353.1,333.2L346.8,325.2L344.1,320.1L340,315.4L329.4,307.4L328.6,305.8L317.1,297.8L324.3,301.8L326.4,300.7L325.2,296.9L321.8,298.6L312.2,292.2L315.3,295.8L310.3,291.8L309.1,287L311.2,287.3L309.4,279.7L308.8,285.7L305.5,283.6L301.8,275.8L306.1,280.5L306.3,277.5L310,279.6L307.3,275.6L303.9,273.5L300.2,273.8L299.4,270.1L298.6,273.7L296.7,270L289.4,265.3L285.7,266.1L276.2,260.2L280.7,258.8L283.1,254.7L275.8,258.5L274.7,256.2L270.6,255.7L271.1,253.7L266.5,251L266.9,243L271.9,235.8Z"},"ch":{"n":"Chihuahua","d":"M297.9,210.9L294.8,208.9L291.8,204L293.2,199.5L292.9,192.8L289.2,188.8L289.8,187L286.5,184.1L285.6,181.3L282.2,178.7L278.7,169.3L281.2,166L287,165.7L294.2,167.7L297.3,165.1L294.5,155L295.4,149.5L293.6,127.7L296.5,127.6L299.5,106L298.8,89.9L295.6,86.5L292.5,85.2L285.5,78.2L288.5,61.1L310.7,62L311.2,46.5L361.1,48L365.7,50L367.7,54.8L371.2,59.4L375.9,61.3L382.9,68.8L388,72.6L389,75L394.7,80.3L398.6,81.7L405.2,86.3L408.8,90.6L409.8,95.4L414.8,102.9L414.8,111.6L418.2,116.9L419.3,121L424.7,125.5L427.2,125.9L433.5,132.3L441.5,134.4L445.1,138L449,138.7L454.2,143L456,142.9L436.5,181L447,224.8L437.2,220.8L431.9,220.4L428.3,222.1L419.4,234.2L417.1,234.8L409.8,230.2L405,229.6L403.8,231.1L401,227.9L394.5,231.1L387.5,227.1L383.7,222.7L379.7,222.9L373,217.8L371,221.3L368.9,221L368.6,225.5L366.8,227.3L366.6,231.8L360.3,234L362,240.6L361.2,244.1L357.2,246.6L356.5,253.9L350.9,258.8L344.2,258.4L334.4,250.4L331.9,242.9L329.8,241.3L319.1,238.8L318.2,237.1L317.1,224.9L312.3,217.3L311.7,213.7L306.4,211.8L304.6,209.3L301,207.9L297.9,210.9Z"},"ve":{"n":"Veracruz","d":"M760.7,504.8L764.1,512.1L763.4,516L767,517.5L768.3,520L775.2,522.7L779.4,526.8L778.7,531.2L780.6,532.7L779.2,535.4L771.5,541.1L735.9,540.6L733.6,535.7L731.1,534.7L724.8,528.4L726.1,523.1L713,531.3L706.8,530.9L702.7,522.5L706.8,514.9L704.5,510.7L700.6,509.4L695.6,510.3L691.5,508.6L690.7,505.7L686.3,500.9L685,497.1L678.7,494.8L676.4,493L677.6,497.5L674.7,502L672.2,497.2L662,499.4L660.9,494.3L655.1,493.4L654.3,489L657.6,485.3L656,476.9L661.1,476L665.1,472.1L657.1,470.7L651,467.2L653.7,465.9L651.2,462.7L653.3,458.5L653.5,451.7L658.2,445L658.2,442.7L649.9,439.2L647.7,440L645.5,443.6L640.6,441.9L637.8,439.2L637.7,433.5L640.2,432.4L642,434.1L644.5,430.9L643.4,428.3L639.6,427.7L638.2,421.8L634.1,420.3L632,423.6L631.7,429.9L630.2,432.2L629.2,426.1L626.4,425.3L619.4,434.3L618,433.3L616.2,436.6L614.1,437L611.8,433.3L613.5,427.9L615.8,426.1L617,419.2L622.1,420.6L622,416.8L625.2,412.1L622.4,409.5L620,409.9L620.4,406.5L617.7,409.5L613.2,405.9L614.7,402.8L612.4,401.3L611.7,397L607.9,394.2L608.5,391.6L613.5,388.3L610,384L613.5,381.2L616.3,375.2L615.8,371.3L607.7,366.4L613.4,365.6L618,366.4L618.2,364.2L621.1,363.7L624.6,367.2L631,369.2L632.2,372.2L634.7,370.2L635.7,376.3L640.8,385.1L650.8,394.1L650,399.1L647.9,404.1L645.9,398.6L648.5,397.2L648.8,394.5L645.2,391.8L637.1,381.2L639.6,392L642.4,396.6L645.3,397.1L645.2,399.9L655.8,419.8L657.5,425.4L673.7,441.6L681.4,451.2L688.1,470.1L692.3,473L694.7,476.7L698.4,478.5L699.8,482.6L703.1,486.1L699.4,485.4L704.5,488.8L712.5,490.8L707.1,488.5L714.9,489.9L724.3,489.3L731.4,494.3L737.9,495L746.1,506.3L750,507.6L760.7,504.8Z"},"za":{"n":"Zacatecas","d":"M425.3,375.1L429.2,362.1L429.8,345.8L431.5,343.4L432.4,334.9L437.6,330.4L438.3,327.5L441,328.2L441.8,326.1L439.5,323.3L440.5,320.6L438.7,318.1L440.7,317.4L440.6,313.1L446.1,310L450.9,303.8L453.6,303.4L454.6,300.8L459.4,298.5L473.4,301.2L483.1,298.9L482.9,286.9L477.2,278.2L479.9,276.6L492.7,275.1L502.5,278L505.5,282.6L511.1,284.4L510.3,288.8L515.2,288.8L518.8,285.8L523.5,287.1L526.7,292.4L535.2,294.7L534,298.2L530.2,301.6L522.6,314.7L509.6,324.8L507.9,327.5L504.4,329.2L501,333.6L496.9,337.1L493.1,335.5L491.4,340.3L489.7,341.5L492.1,345.9L491.3,350L495.8,357.7L501,361.4L505,366.9L507.2,368L511.4,366.3L512.8,363.2L520.2,362.9L521.9,366.7L519.4,370.9L521.4,380.2L515.3,388.8L512,385.8L507.5,384.7L500.5,379.4L499.7,374.1L497.2,373.6L494.4,370.9L492.9,371.5L490.3,367.7L488.7,370.1L483.4,373.4L479.9,373.4L479.1,376.6L472.9,386.3L472.5,389L475.6,392.5L475.1,397.3L479.5,398.7L478.2,404.4L474.2,408.2L466.6,408.4L466.3,416.8L460.6,415.7L451.8,411.7L449,411.8L447.6,409.7L444.4,410.6L445.4,405.3L444.4,400.5L446.6,401.7L451.3,397.8L451.1,390.3L455,386.5L458.6,384.5L462.9,384.1L465,381.5L463.7,379.2L466.4,375.4L466,373.5L461.8,373L461.8,371L455.9,366.4L454.1,370L456.3,372.1L453.5,375.8L452.2,379.4L446.2,379.4L446,373.1L448.3,366.1L446.7,363.9L443.4,364.9L440.6,378L439.4,372.4L440.6,364.6L442.4,362.8L442.9,358.9L436.3,357.7L436.1,364.4L438.2,367.4L437.1,371.6L431.6,372.4L425.3,375.1Z"},"ag":{"n":"Aguascalientes","d":"M504.8,382.9L503.3,385.1L498.3,388.2L497.4,391.6L492.6,394.7L483.5,393.9L479.8,391.6L475.6,392.5L472.5,389L472.9,386.3L479.1,376.6L479.9,373.4L483.4,373.4L488.7,370.1L490.3,367.7L492.9,371.5L494.4,370.9L497.2,373.6L499.7,374.1L500.5,379.4L504.8,382.9Z"},"ja":{"n":"Jalisco","d":"M475.6,392.5L479.8,391.6L483.5,393.9L492.6,394.7L497.4,391.6L498.3,388.2L503.3,385.1L504.8,382.9L507.5,384.7L512,385.8L515.3,388.8L513.5,391L514.8,395.9L511.8,400L513.9,405.7L510.3,409.7L507.6,409.9L505,412.7L499,422.3L497.8,427.3L501.3,430.6L501.2,433.2L497.4,439L492.8,440.6L491.1,439.9L484.6,441.7L478.8,445L465.9,449L466.1,452.7L475.9,454L478,457.2L474.7,458.7L475.1,463.2L477.1,466.8L476.9,470.5L481.1,470L483.3,473.5L479.8,478.9L477.5,478L472.4,479.9L469,484.9L463.2,488.2L459,485.3L457.3,487.7L453.1,488.1L451.5,483.8L452.4,476.1L449,473L447.9,470.3L441.5,473.4L434.4,469.8L432.1,470.9L429,476L420.6,479.2L418.6,478.5L416.8,481.9L412.2,479.2L409.8,479.2L402.9,474.4L400.6,467.7L395.4,464.1L386.5,451.5L385.7,445.7L381,438.6L385.1,435.9L393.1,435L395.9,432.6L394.3,429.1L400.6,421.2L406.2,420.7L410.2,417.8L412.5,418.1L415.9,421.1L419.1,421.7L420.6,423.8L426.7,428.5L427.2,423.2L429.1,419.4L428.8,412.6L433.3,411.4L436.5,409.1L437.7,405.5L429.1,400.6L430.8,398L432.7,391.5L423.1,381.2L425.3,375.1L431.6,372.4L437.1,371.6L438.2,367.4L436.1,364.4L436.3,357.7L442.9,358.9L442.4,362.8L440.6,364.6L439.4,372.4L440.6,378L443.4,364.9L446.7,363.9L448.3,366.1L446,373.1L446.2,379.4L452.2,379.4L453.5,375.8L456.3,372.1L454.1,370L455.9,366.4L461.8,371L461.8,373L466,373.5L466.4,375.4L463.7,379.2L465,381.5L462.9,384.1L458.6,384.5L455,386.5L451.1,390.3L451.3,397.8L446.6,401.7L444.4,400.5L445.4,405.3L444.4,410.6L447.6,409.7L449,411.8L451.8,411.7L460.6,415.7L466.3,416.8L466.6,408.4L474.2,408.2L478.2,404.4L479.5,398.7L475.1,397.3L475.6,392.5Z"},"mi":{"n":"Michoacán","d":"M556.3,443.9L560,448.1L560.1,451.8L561.8,453.2L559.2,466.1L561.1,471L555.6,474.5L556.7,476.7L544.4,492.9L543.4,490.8L541,493.4L543,502.8L547.1,505.7L544.6,508.9L544.4,506.2L540.3,503.1L535.5,503.1L533.5,501.8L525.9,502L518.2,504.2L513.1,500.8L506.8,501L505.1,505.1L505.7,510.7L504,513.6L496.5,515.3L496.2,523.6L482.1,519.4L477.4,518.8L468.1,514.8L465.2,514.7L452.5,509.9L450,504.4L445.6,500.6L444.5,497.6L448.3,493.7L448.9,490.7L453.1,488.1L457.3,487.7L459,485.3L463.2,488.2L469,484.9L472.4,479.9L477.5,478L479.8,478.9L483.3,473.5L481.1,470L476.9,470.5L477.1,466.8L475.1,463.2L474.7,458.7L478,457.2L475.9,454L466.1,452.7L465.9,449L478.8,445L484.6,441.7L491.1,439.9L492.8,440.6L497.4,439L502.3,439.6L503.9,445.2L510.8,445.2L513.1,441.4L518.2,440.5L520.9,442.7L519.6,450L527,450.6L527.9,448.3L533.3,448.6L532.8,453.4L536.1,454.2L538.9,452.4L540.6,454.6L547.6,453.2L548.2,454.4L552.9,452.4L552.8,448.7L556.3,443.9Z"},"oa":{"n":"Oaxaca","d":"M766.4,576.2L764.2,573.6L761.6,574.6L754.9,571.8L754.4,574.3L761.4,575.9L766.1,578L765.4,579.4L754.3,575.5L745.5,575.7L749.2,572.4L746.8,569.8L743.3,572.4L740.1,567.7L733.3,573.6L741.9,574.4L727.7,577.8L723.9,580.6L721.3,584.3L704,590.2L694.8,595.6L688.3,595.4L684.1,596.8L679.9,595.2L674.4,594.7L668.4,592.3L663.7,589.1L660.1,588.1L643.1,587.2L629.6,579.6L616.8,576.2L622.1,574.3L624.4,572L623.9,567.6L627.1,567L626.8,562.8L629.5,562.6L632.3,559.9L634.4,551.3L629.3,545L626.7,544.8L623.1,540.9L623.1,536L620.9,530.6L622.7,523L621.9,521.8L625.4,521L627.6,517.3L635.8,516.4L637,519.8L639.7,519.8L642.1,517.3L639.2,512.8L642,507L645.9,504.9L644.9,510.4L648.2,513.6L650,517.4L652.3,517.4L655.8,512L659.9,510.7L665.3,512.4L669.9,507.9L672.9,506.5L677.6,497.5L676.4,493L678.7,494.8L685,497.1L686.3,500.9L690.7,505.7L691.5,508.6L695.6,510.3L700.6,509.4L704.5,510.7L706.8,514.9L702.7,522.5L706.8,530.9L713,531.3L726.1,523.1L724.8,528.4L731.1,534.7L733.6,535.7L735.9,540.6L771.5,541.1L772,545.9L770.8,550.5L767,553.1L767,558.3L764.3,563.8L767.6,571.8L766.4,576.2Z"},"pu":{"n":"Puebla","d":"M610.9,483.2L611.2,477.5L609.7,470.6L610.6,468.1L616.3,468.8L620.3,475.4L625.6,479.9L630.2,476.1L634.2,477.8L636.9,475.9L637.3,472.4L642.6,473.1L644.1,470.3L639.4,467.6L636.7,468.1L636.6,464.4L630.1,461.5L630.3,459.5L626.5,460.3L623,453.5L627.5,446L626.2,441.8L622.6,442.2L622.8,438.3L625.3,437.7L631.7,429.9L632,423.6L634.1,420.3L638.2,421.8L639.6,427.7L643.4,428.3L644.5,430.9L642,434.1L640.2,432.4L637.7,433.5L637.8,439.2L640.6,441.9L645.5,443.6L647.7,440L649.9,439.2L658.2,442.7L658.2,445L653.5,451.7L653.3,458.5L651.2,462.7L653.7,465.9L651,467.2L657.1,470.7L665.1,472.1L661.1,476L656,476.9L657.6,485.3L654.3,489L655.1,493.4L660.9,494.3L662,499.4L672.2,497.2L674.7,502L672.9,506.5L669.9,507.9L665.3,512.4L659.9,510.7L655.8,512L652.3,517.4L650,517.4L648.2,513.6L644.9,510.4L645.9,504.9L642,507L639.2,512.8L642.1,517.3L639.7,519.8L637,519.8L635.8,516.4L627.6,517.3L625.4,521L621.9,521.8L619.6,519.6L615.1,520L607.3,517.4L605.9,514.7L602.9,513.9L599.1,510.7L598.4,506.8L606.2,501.6L610.6,503.8L607.8,494.7L610.4,494.9L608.3,490.6L610.7,487.8L610.9,483.2Z"},"gr":{"n":"Guerrero","d":"M598.4,506.8L599.1,510.7L602.9,513.9L605.9,514.7L607.3,517.4L615.1,520L619.6,519.6L621.9,521.8L622.7,523L620.9,530.6L623.1,536L623.1,540.9L626.7,544.8L629.3,545L634.4,551.3L632.3,559.9L629.5,562.6L626.8,562.8L627.1,567L623.9,567.6L624.4,572L622.1,574.3L616.8,576.2L609.1,568.3L606.5,569.3L589.2,565L581.6,564.6L577.1,563.1L568.6,557.1L533.1,545.6L533.2,544.3L528.9,540.6L519.9,536.9L518.5,533.8L513.6,532.1L512.6,529.6L508,524.5L500.6,521.2L496.2,523.6L496.5,515.3L504,513.6L505.7,510.7L505.1,505.1L506.8,501L513.1,500.8L518.2,504.2L525.9,502L533.5,501.8L535.5,503.1L540.3,503.1L544.4,506.2L544.6,508.9L547.1,505.7L543,502.8L541,493.4L543.4,490.8L544.4,492.9L546.4,490.2L551.9,491.1L552.8,497.8L555.6,501.7L555.1,504.3L558.2,506.4L562.2,502.9L564.6,498.8L571.9,496.8L574,498.2L578,493.2L580.8,495.8L583.4,496L586.4,501L589,503.5L591.9,503.4L593.4,499.8L598.4,506.8Z"},"tl":{"n":"Tlaxcala","d":"M610.6,468.1L608.2,464.1L609.9,463.9L612.6,462.1L620.1,463.2L622.5,459L626.5,460.3L630.3,459.5L630.1,461.5L636.6,464.4L636.7,468.1L639.4,467.6L644.1,470.3L642.6,473.1L637.3,472.4L636.9,475.9L634.2,477.8L630.2,476.1L625.6,479.9L620.3,475.4L616.3,468.8L610.6,468.1Z"},"tm":{"n":"Tamaulipas","d":"M560.8,339.6L560.8,337.1L558.5,335.7L561.1,333.5L565.5,334.8L563.9,329.7L567.2,322.2L574.7,321L578.9,314.4L574.7,310.8L573.8,308.3L574.9,301.2L573.7,295.4L570.5,296.9L569.6,293.5L572.2,291.2L575.4,290.8L577.4,287.5L583.1,284.2L587.3,285.9L586.4,278.3L590.9,273.9L595.6,274.8L608.8,262.6L605.4,260.9L604.1,243L596.6,241.2L594.3,244.4L590,240.4L586.5,241.8L585,234.1L582.5,233.7L579.9,230.3L578.1,231.4L577.1,228.1L578.1,224.4L577.1,222.6L572.2,220.6L569.6,220.8L572.2,215.5L567.8,213.5L566.9,210.2L568.2,205.3L564.8,193.5L560.8,193L560.6,190.5L566.5,186.9L570,187.6L572.9,190L574.2,195L572.8,199.1L575.8,202.5L574.8,208.1L577,209.7L578.9,215L581.8,215.9L582.4,223.9L586.5,225.6L587.6,229.6L596.6,230.6L601.6,234.7L603.4,233.9L610,236L614.8,239.9L627.9,239.6L633.6,241.2L640,246.3L644.8,242.3L648.8,241.9L648.4,250.3L644.1,262.1L640.2,269.6L635.3,292.7L634.1,310.3L633.6,336.2L634.9,346.1L631.8,354.5L632.2,361.3L634.7,370.2L632.2,372.2L631,369.2L624.6,367.2L621.1,363.7L618.2,364.2L618,366.4L613.4,365.6L603,366.9L601.6,368.5L597.5,368.3L587.5,365.6L583,358.1L581.8,359.6L577.6,356.9L578.3,360.2L563.5,355.5L561.8,352.4L565.6,349.2L565.6,347.1L562,341.9L560,343.8L560.8,339.6ZM631.2,291.3L629.8,295.9L632.8,294.9L633.2,303.8L632.4,312.1L633.5,316.9L634.7,291.3L637.8,273.9L641.2,265.7L641.2,261.1L638,259.7L638.2,262.2L636.5,265L632.6,263.4L631.9,267.2L633.2,270.6L631.4,277.1L635.3,278.3L632.4,280.8L634.3,289L633.1,294.1L631.2,291.3Z"},"co":{"n":"Coahuila","d":"M456,142.9L461,144.2L462.3,141.8L469.6,135.8L468.4,134.2L471.8,123.3L474.7,118.1L479.6,116.6L482.9,116.8L485.4,112.7L491.8,115.8L506.2,116.4L508.7,114.7L509.5,116.6L512.9,116.1L514.3,119.5L518.1,121.6L517.4,126L524.2,126.7L525,129.1L531.2,133.1L532.8,136.3L535.8,138.2L537.3,144.8L540.6,148.8L541.5,152.1L544.5,155.9L548.3,166L551.1,169L554.8,170.7L563.5,183.6L558.7,188.3L552,183.2L547.6,186.5L546,190L544.7,197.7L538.9,199.6L533.6,203.8L533.8,209L536.5,210.3L537.7,207.6L541.5,209.8L540.6,219L537,224.1L535.6,220.3L521.7,233L525,235.9L527.3,240.3L530.6,242.8L531,245.5L533.4,247L533.5,252.8L537.6,258.5L539.6,258.7L542.4,262.5L539.4,261.5L542.5,265.3L546.3,267.7L551,267.5L554.3,269.8L552.4,272.2L548.7,272.8L544.1,271.7L540,272.4L536.5,274.7L534.6,278.4L537.9,281L535.9,283.4L536.9,288.4L535.2,294.7L526.7,292.4L523.5,287.1L518.8,285.8L515.2,288.8L510.3,288.8L511.1,284.4L505.5,282.6L502.5,278L492.7,275.1L479.9,276.6L477.2,278.2L472,284.4L471.9,290.3L467.8,287.6L462.6,286.3L459.1,283.8L458.2,278.6L454.7,276.3L450.9,271L453.5,266.8L451.5,262.6L456.7,257.1L455.9,242.6L457.8,237.8L457.6,234.3L447,224.8L436.5,181L456,142.9Z"},"yu":{"n":"Yucatán","d":"M878.4,404.6L877.1,404.9L879.4,397.1L886.6,391.8L896.6,386.6L918.2,381.8L931.7,377.1L934.7,374L939.7,372.1L945.2,372.1L950,369.5L955.7,369.4L964.2,370.8L960.9,371.7L970,371.4L971.2,378.5L970,385.3L972.3,390.7L968.8,402.1L961.8,408.7L958.2,410.8L953.3,410.4L950,414.9L946.7,416.8L944.8,421.1L936.4,425.6L930,431L925.3,432L920.6,435.6L915.2,436.9L914.2,442.9L912.4,438.6L908.7,435L905.8,430.7L899.4,427L897.1,422.6L894.5,420.9L891.5,416L890.2,418.2L886.7,418L884.2,415.2L879,414.4L878.4,404.6Z"},"dg":{"n":"Durango","d":"M344.2,258.4L350.9,258.8L356.5,253.9L357.2,246.6L361.2,244.1L362,240.6L360.3,234L366.6,231.8L366.8,227.3L368.6,225.5L368.9,221L371,221.3L373,217.8L379.7,222.9L383.7,222.7L387.5,227.1L394.5,231.1L401,227.9L403.8,231.1L405,229.6L409.8,230.2L417.1,234.8L419.4,234.2L428.3,222.1L431.9,220.4L437.2,220.8L447,224.8L457.6,234.3L457.8,237.8L455.9,242.6L456.7,257.1L451.5,262.6L453.5,266.8L450.9,271L454.7,276.3L458.2,278.6L459.1,283.8L462.6,286.3L467.8,287.6L471.9,290.3L472,284.4L477.2,278.2L482.9,286.9L483.1,298.9L473.4,301.2L459.4,298.5L454.6,300.8L453.6,303.4L450.9,303.8L446.1,310L440.6,313.1L440.7,317.4L438.7,318.1L440.5,320.6L439.5,323.3L441.8,326.1L441,328.2L438.3,327.5L437.6,330.4L432.4,334.9L431.5,343.4L429.8,345.8L429.2,362.1L425.9,373.2L425.2,367.8L420.6,369.9L417.1,368.4L414.6,362.7L411.2,360.9L404.9,365.5L404.1,360.9L407.6,357.1L405.7,352.7L399.9,349.2L391.7,348.6L391.6,344.6L386.6,344.1L382.3,339.4L381.5,333.7L378,330.1L375.8,325.1L375.3,317.3L377.1,313.1L374.3,312.7L371.2,305.5L366.6,301.8L364.2,301.8L360.1,305.2L356.9,305L354.1,302.3L353.4,298.4L349.2,290.8L346.2,287.7L343.8,287.4L340.6,283.1L338,273.8L339.1,265.9L340.2,263.1L344.2,258.4Z"},"gj":{"n":"Guanajuato","d":"M571.2,401.9L571.2,406.4L574.1,407.8L570.3,411L566,409.6L563,411.2L561.6,419.5L559.1,420.9L556.8,419.1L554.6,420.4L550,418.1L546.8,426L549.4,432.6L549.7,436.3L553.5,441.8L556.3,443.9L552.8,448.7L552.9,452.4L548.2,454.4L547.6,453.2L540.6,454.6L538.9,452.4L536.1,454.2L532.8,453.4L533.3,448.6L527.9,448.3L527,450.6L519.6,450L520.9,442.7L518.2,440.5L513.1,441.4L510.8,445.2L503.9,445.2L502.3,439.6L497.4,439L501.2,433.2L501.3,430.6L497.8,427.3L499,422.3L505,412.7L507.6,409.9L510.3,409.7L513.9,405.7L511.8,400L514.8,395.9L513.5,391L515.3,388.8L517.6,389.4L521.6,387.6L523.7,391L533.3,391.5L544.2,400.2L548.3,399.4L549.6,394.7L551.2,393.6L561.9,397.6L565.8,400.7L571.2,401.9Z"},"sl":{"n":"San Luis Potosí","d":"M560.8,339.6L560,343.8L562,341.9L565.6,347.1L565.6,349.2L561.8,352.4L563.5,355.5L578.3,360.2L577.6,356.9L581.8,359.6L583,358.1L587.5,365.6L597.5,368.3L601.6,368.5L603,366.9L607.7,366.4L615.8,371.3L616.3,375.2L613.5,381.2L610,384L613.5,388.3L608.5,391.6L607.9,394.2L611.7,397L612.4,401.3L610.1,402.1L610,407.8L602.7,409.3L598.8,405.5L595.5,406.4L593.2,405.7L593.5,402.6L590,393.5L584.4,401.1L578.3,402.7L573.4,398.6L571.2,401.9L565.8,400.7L561.9,397.6L551.2,393.6L549.6,394.7L548.3,399.4L544.2,400.2L533.3,391.5L523.7,391L521.6,387.6L517.6,389.4L515.3,388.8L521.4,380.2L519.4,370.9L521.9,366.7L520.2,362.9L512.8,363.2L511.4,366.3L507.2,368L505,366.9L501,361.4L495.8,357.7L491.3,350L492.1,345.9L489.7,341.5L491.4,340.3L493.1,335.5L496.9,337.1L501,333.6L504.4,329.2L507.9,327.5L509.6,324.8L522.6,314.7L530.2,301.6L534,298.2L535.2,294.7L542.4,304.2L543.6,316.3L546.6,320L546.5,325.5L548,330.6L547.6,333.9L548.8,340.4L551.9,341.6L552.3,339.4L560.8,339.6Z"},"hg":{"n":"Hidalgo","d":"M612.4,401.3L614.7,402.8L613.2,405.9L617.7,409.5L620.4,406.5L620,409.9L622.4,409.5L625.2,412.1L622,416.8L622.1,420.6L617,419.2L615.8,426.1L613.5,427.9L611.8,433.3L614.1,437L616.2,436.6L618,433.3L619.4,434.3L626.4,425.3L629.2,426.1L630.2,432.2L625.3,437.7L622.8,438.3L622.6,442.2L626.2,441.8L627.5,446L623,453.5L626.5,460.3L622.5,459L620.1,463.2L612.6,462.1L609.9,463.9L611.4,458.5L608.3,454.8L603.8,453.7L601.3,456.7L599.5,456.1L600.6,452.3L597.7,448.6L591.7,450.9L586,458.8L583.9,453.5L581.5,452.1L582.4,448.4L580.3,445.1L577.3,446.2L570.6,440.2L571.2,433.2L577.2,431.1L581.7,427.7L580.6,425.3L581.5,421.8L583.9,419.6L585.7,415L585.3,412.2L589.7,411.7L595.6,409.6L595.5,406.4L598.8,405.5L602.7,409.3L610,407.8L610.1,402.1L612.4,401.3Z"}},"cities":{"CDMX":[594.7,469.7],"Guadalajara":[456.9,429.7],"Monterrey":[550.4,256.3],"Tijuana":[54.6,1.1],"Mérida":[903.1,397.2],"Cancún":[994.3,380.9],"Hermosillo":[225.1,135.9],"Culiacán":[329.4,287.0],"Chihuahua":[372.6,156.3],"Saltillo":[529.1,265.5],"Reynosa":[613.0,239.8],"Veracruz":[693.2,474.9],"Oaxaca":[676.9,548.6],"Tuxtla":[797.6,553.6],"León":[510.6,413.6],"Morelia":[527.3,462.1],"Acapulco":[572.3,559.1],"La Paz":[236.8,306.7],"Durango":[414.9,314.9],"Zacatecas":[481.0,357.4],"Tepic":[407.3,401.3],"Colima":[445.2,478.8],"Campeche":[876.5,439.5],"Toluca":[577.5,475.0],"Cd. Juárez":[363.9,51.0],"Mexicali":[101.2,2.5]}};
+MAP.states.df.n='Ciudad de México';MAP.states.mx.n='Estado de México';
+const $ = s => document.querySelector(s);
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (n, d=0) => n.toLocaleString('es-MX',{minimumFractionDigits:d,maximumFractionDigits:d});
+function rng(seed){return ()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ---------- Módulos ---------- */
+const MODS=[
+ {c:'M1',n:'App del operador',w:'Operador en ruta',p:'Prueba de entrega en la puerta: escaneo de guía, foto, firma o código OTP, geocerca y motivo estandarizado cuando no se entrega.',f:['Escaneo de guía','Foto + firma','Lat/long y hora','Motivo de no entrega','Temperatura (perecederos)','Cobro contra entrega'],k:'OTIF · Primer intento · Integridad de perecederos'},
+ {c:'M2',n:'Recepción y cross-dock',w:'Almacenista CEDIS',p:'Ingreso de paquetes por lote del cliente, clasificación por ruta y salida a unidad. Detecta faltantes antes de que salgan a calle.',f:['Manifiesto vs recibido','Peso y medidas','Daño a la recepción','Clasificación por ruta','Hora de salida'],k:'Exactitud de inventario · Dwell time · Salida a tiempo'},
+ {c:'M3',n:'Despacho y rutas',w:'Despachador',p:'Planeación de rutas por segmento (ventanas de supermercado, día siguiente de e-commerce, recolección en centro comercial) con capacidad por vehículo, asignación a operador y reasignación en vivo cuando falla una unidad.',f:['Ruta planeada','Capacidad cargada','Operador asignado','Ventanas de entrega','Reasignaciones'],k:'Ocupación · Km planeado vs real · Paradas por ruta'},
+ {c:'M4',n:'Telemetría de flota',w:'Automático (GPS)',p:'Posición cada 30 s, odómetro, velocidad y paros. Para motos y vehículos de terceros, el GPS del teléfono en la app sustituye al dispositivo.',f:['Posición y velocidad','Odómetro','Paros no planeados','Combustible','Mantenimiento'],k:'Km por entrega · Costo de flota · Disponibilidad'},
+ {c:'M5',n:'Incidencias y devoluciones',w:'Supervisor de plaza',p:'Registro de siniestros, daños, extravíos, robos y devoluciones al cliente con evidencia y estado de reclamación.',f:['Tipo de incidencia','Evidencia','Monto reclamado','Responsable','Cierre'],k:'Incidencias por mil · Tasa de daño · Tiempo de cierre'},
+ {c:'M6',n:'Voz del destinatario',w:'Destinatario (WhatsApp)',p:'Aviso de llegada, reprogramación por el propio destinatario y encuesta de una pregunta al cerrar la entrega.',f:['Aviso enviado','Reprogramación','Calificación 1–5','Comentario','Queja'],k:'CSAT · NPS · Reprogramaciones evitadas'},
+ {c:'M7',n:'Talento y operadores',w:'Recursos humanos',p:'Embudo de reclutamiento, alta, capacitación y certificación del operador, asistencia diaria y motivos de baja.',f:['Etapa del candidato','Capacitación','Asistencia','Evaluación','Motivo de baja'],k:'Rotación · Ausentismo · Días a productividad'},
+ {c:'M8',n:'Liquidación y costo',w:'Finanzas',p:'Tarifa por envío según cliente y zona, costo directo de ruta, pago por entrega a operadores y conciliación de cobros contra entrega.',f:['Tarifa aplicada','Costo de ruta','Pago a operador','COD conciliado','Facturación'],k:'Costo por entrega · Margen por cliente · Días de cobro'}
+];
+$('#mods').innerHTML=MODS.map(m=>`<article class="mod"><div class="code"><span>${m.c}</span><span class="who">${m.w}</span></div><h3>${m.n}</h3><p>${m.p}</p><div class="chips">${m.f.map(x=>`<span class="chip">${x}</span>`).join('')}</div><div class="feeds"><b>ALIMENTA</b>${m.k}</div></article>`).join('');
+
+/* ---------- KPIs ---------- */
+const PERS={S:'Servicio al cliente',O:'Operación',F:'Flota',P:'Personas',$:'Finanzas',V:'Sustentabilidad'};
+const KPIS=[
+ ['S','OTIF (a tiempo y completo)','Entregas a tiempo y completas ÷ entregas comprometidas','≥ 95%','Diaria','Gerente de plaza'],
+ ['S','Entrega al primer intento','Entregadas en 1er intento ÷ envíos que salieron a ruta','≥ 90%','Diaria','Gerente de plaza'],
+ ['S','Tiempo de tránsito','Hora de entrega − hora de recepción en CEDIS (mediana)','≤ 24 h','Diaria','Torre de control'],
+ ['S','Cumplimiento de ventana','Entregas dentro de la ventana prometida ÷ entregas con ventana','≥ 92%','Diaria','Despacho'],
+ ['S','CSAT del destinatario','Promedio de calificación 1–5 en encuesta post-entrega','≥ 4.5','Semanal','Atención a clientes'],
+ ['S','Integridad de perecederos','Entregas de supermercado sin rechazo por temperatura o daño ÷ entregas de supermercado','≥ 99%','Diaria','Gerente de plaza'],
+ ['S','SLA por segmento','OTIF calculado por separado para supermercado, e-commerce y centro comercial','Según contrato','Semanal','Comercial'],
+ ['S','Quejas por mil envíos','Quejas registradas × 1,000 ÷ envíos entregados','≤ 3','Semanal','Atención a clientes'],
+ ['O','Paradas por hora','Paradas completadas ÷ horas en ruta','≥ 6 (van) / 9 (moto)','Diaria','Despacho'],
+ ['O','Envíos por ruta','Envíos entregados ÷ rutas operadas','Según vehículo','Diaria','Despacho'],
+ ['O','Salida a tiempo de CEDIS','Rutas que salen antes de la hora meta ÷ rutas','≥ 95%','Diaria','Jefe de CEDIS'],
+ ['O','Rezago (backlog)','Envíos recibidos no despachados al cierre del día','≤ 2% del volumen','Diaria','Jefe de CEDIS'],
+ ['O','Exactitud de recepción','Paquetes recibidos que cuadran con manifiesto ÷ manifestados','≥ 99.5%','Diaria','Jefe de CEDIS'],
+ ['O','Incidencias por mil','Daños + extravíos + robos × 1,000 ÷ envíos','≤ 1.5','Semanal','Seguridad'],
+ ['F','Km por entrega','Km recorridos ÷ entregas realizadas','Bajar 10% año 1','Semanal','Flota'],
+ ['F','Ocupación de unidad','Volumen cargado ÷ capacidad del vehículo','≥ 80%','Diaria','Despacho'],
+ ['F','Disponibilidad de flota','Unidades operativas ÷ unidades totales','≥ 95%','Diaria','Flota'],
+ ['F','Km planeado vs real','Km reales ÷ km de la ruta planeada','≤ 1.10','Diaria','Despacho'],
+ ['P','Rotación de operadores','Bajas del mes ÷ plantilla promedio','≤ 8% mensual','Mensual','Recursos humanos'],
+ ['P','Ausentismo','Operadores ausentes ÷ programados','≤ 5%','Diaria','Gerente de plaza'],
+ ['P','Días a productividad','Días desde alta hasta alcanzar 80% de la productividad meta','≤ 10 días','Mensual','Recursos humanos'],
+ ['P','Operadores certificados','Operadores con capacitación vigente ÷ activos','100%','Mensual','Recursos humanos'],
+ ['$','Costo por entrega','Costo directo de ruta (operador + vehículo + combustible) ÷ entregas','≤ 70% de la tarifa','Semanal','Finanzas'],
+ ['$','Margen por cliente','(Ingreso − costo directo) ÷ ingreso, por cliente','≥ 25%','Mensual','Dirección'],
+ ['$','Ingreso por ruta','Ingreso facturado ÷ rutas operadas','Según plaza','Semanal','Finanzas'],
+ ['$','Conciliación COD','Cobros contra entrega depositados en 48 h ÷ cobrados','100%','Diaria','Finanzas'],
+ ['V','CO₂ por entrega','Combustible × factor de emisión ÷ entregas','Bajar 15% año 2','Mensual','Dirección'],
+ ['V','Entregas en vehículo eficiente','Entregas en moto o eléctrico ÷ total urbano','≥ 40% urbano','Mensual','Flota']
+];
+let kpiF='all';
+function drawKpis(){
+  $('#kpiSeg').innerHTML=[['all','Todas'],...Object.entries(PERS)].map(([k,v])=>`<button type="button" data-k="${k}" aria-pressed="${kpiF===k}">${v}${k==='all'?` · ${KPIS.length}`:` · ${KPIS.filter(r=>r[0]===k).length}`}</button>`).join('');
+  $('#kpiBody').innerHTML=KPIS.filter(r=>kpiF==='all'||r[0]===kpiF).map(r=>`<tr><td><b>${r[1]}</b><br><span class="persp">${PERS[r[0]]}</span></td><td class="f">${r[2]}</td><td class="num">${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td></tr>`).join('');
+}
+$('#kpiSeg').addEventListener('click',e=>{const b=e.target.closest('button');if(b){kpiF=b.dataset.k;drawKpis()}});
+drawKpis();
+
+/* ---------- Reglas ---------- */
+const RULES=[
+ ['crit','Primer intento < 85% en una zona durante 3 días','Re-sectorizar la zona y activar confirmación previa por WhatsApp','Gerente de plaza','48 h'],
+ ['crit','Rezago > 5% del volumen al cierre','Abrir turno vespertino o mover operadores de la plaza vecina','Torre de control','Mismo día'],
+ ['warn','Costo por entrega > 75% de la tarifa del cliente','Revisar mezcla de vehículos; si persiste 4 semanas, renegociar tarifa','Finanzas + Comercial','30 días'],
+ ['warn','Ocupación de van < 65% por 2 semanas','Consolidar rutas o cambiar a sedán o moto en esa zona','Despacho','1 semana'],
+ ['warn','Rotación mensual > 12% en una plaza','Entrevistas de salida, revisar esquema de pago por entrega y carga de ruta','Recursos humanos','2 semanas'],
+ ['crit','Incidencias > 3 por mil en una ruta','Auditoría de ruta, cambio de horario o escolta en zona de riesgo','Seguridad','72 h'],
+ ['good','Demanda de un estado sin cobertura > 1,500 envíos/mes','Evaluar caso de negocio para abrir plaza (estudio de densidad H3)','Dirección','Trimestral']
+];
+$('#rules').innerHTML=RULES.map(r=>`<tr><td><span class="sev" style="background:var(--${r[0]})"></span>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td></tr>`).join('');
+
+/* ---------- Datos demo ---------- */
+const REG={N:['bc','bs','so','ch','si','dg','co','nl','tm','na','za'],C:['df','mx','ja','gj','mi','cl'],S:['ve','oa','gr','cs','cm','yu','qr']};
+const regionOf=k=>Object.keys(REG).find(r=>REG[r].includes(k));
+const HUB={df:'CDMX',mx:'Toluca',ja:'Guadalajara',nl:'Monterrey',gj:'León',ve:'Veracruz',bc:'Tijuana',ch:'Chihuahua',so:'Hermosillo',si:'Culiacán',tm:'Reynosa',co:'Saltillo',mi:'Morelia',yu:'Mérida',qr:'Cancún',oa:'Oaxaca',cs:'Tuxtla',gr:'Acapulco',dg:'Durango',za:'Zacatecas',na:'Tepic',cl:'Colima',bs:'La Paz',cm:'Campeche'};
+const WEIGHT={df:18,mx:14,ja:9,nl:9,gj:4,ve:4,bc:4,ch:3.5,so:2.5,si:2.5,tm:3,co:3,mi:3,yu:2,qr:2.5,oa:1.5,cs:1.5,gr:1.5,dg:1,za:1,na:1,cl:.7,bs:.8,cm:.6};
+const VEH={moto:{n:'Moto',share:.34,cpe:38,kpe:2.6,otif:.6},sedan:{n:'Sedán',share:.22,cpe:52,kpe:3.6,otif:0},svan:{n:'Small van',share:.28,cpe:46,kpe:4.1,otif:.3},lvan:{n:'Large van',share:.16,cpe:41,kpe:5.4,otif:-.8}};
+const TARIFA=68, BASE=38000;
+const R=rng(42);
+const ST={};
+for(const k in WEIGHT){
+  const tot=Object.values(WEIGHT).reduce((a,b)=>a+b,0);
+  const reg=regionOf(k), remote=reg==='S'?1:reg==='N'?.5:0;
+  ST[k]={vol:BASE*WEIGHT[k]/tot,otif:96.2-remote*2.2-R()*4,fa:92.5-remote*3-R()*5,cpe:40+remote*9+R()*10,inc:.6+R()*1.8+remote*.5,csat:4.3+R()*.5,trend:Array.from({length:30},()=>0)};
+  let o=ST[k].otif; ST[k].trend=ST[k].trend.map(()=>{o+= (R()-.5)*1.4; o=Math.min(99,Math.max(86,o*.9+ST[k].otif*.1)); return o});
+}
+ST.gr.otif=88.4;ST.gr.fa=81.9;ST.oa.inc=3.4;ST.mx.fa=84.6;ST.qr.cpe=63.5;
+
+const state={per:7,reg:'all',veh:'all',metric:'vol',sel:null,hex:'vol'};
+const METRICS={vol:{n:'Volumen',u:'entregas/día',hi:true,f:v=>fmt(v)},otif:{n:'OTIF',u:'%',hi:true,f:v=>fmt(v,1)+'%'},fa:{n:'Primer intento',u:'%',hi:true,f:v=>fmt(v,1)+'%'},cpe:{n:'Costo/entrega',u:'MXN',hi:false,f:v=>'$'+fmt(v,1)},inc:{n:'Incidencias',u:'por mil',hi:false,f:v=>fmt(v,2)}};
+
+function vehAdj(){return state.veh==='all'?{share:1,cpe:0,otif:0,kpe:3.8}:{share:VEH[state.veh].share,cpe:VEH[state.veh].cpe-45,otif:VEH[state.veh].otif,kpe:VEH[state.veh].kpe}}
+function rows(){
+  const va=vehAdj();
+  return Object.keys(ST).filter(k=>state.reg==='all'||regionOf(k)===state.reg).map(k=>{const s=ST[k];return{k,n:MAP.states[k].n,vol:s.vol*va.share,otif:Math.min(99.5,s.otif+va.otif),fa:Math.min(99,s.fa+va.otif),cpe:s.cpe+va.cpe,inc:s.inc,csat:s.csat}});
+}
+function agg(rs){
+  const v=rs.reduce((a,r)=>a+r.vol,0), w=f=>rs.reduce((a,r)=>a+r[f]*r.vol,0)/v;
+  return{vol:v,otif:w('otif'),fa:w('fa'),cpe:w('cpe'),inc:w('inc'),csat:w('csat')};
+}
+
+/* ---------- Tiles ---------- */
+function spark(seed,up){const r=rng(seed);let y=50;const pts=Array.from({length:20},(_,i)=>{y+=(r()-.5+(up?.06:-.06))*14;y=Math.max(8,Math.min(92,y));return[i*(100/19),100-y]});
+  const d=pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+','+(p[1]*.3).toFixed(1)).join('');const l=pts[pts.length-1];
+  return `<svg viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true"><path d="${d}L100,30L0,30Z" fill="var(--teal-soft)"/><path d="${d}" fill="none" stroke="var(--teal)" stroke-width="1.4" vector-effect="non-scaling-stroke"/><circle cx="${l[0]}" cy="${(l[1]*.3).toFixed(1)}" r="1.8" fill="var(--teal)"/></svg>`}
+function drawTiles(){
+  const a=agg(rows()), va=vehAdj(), per=state.per;
+  const km=a.vol*va.kpe;
+  const T=[
+    ['Entregas',fmt(Math.round(a.vol*per)),per===1?'hoy':'en '+per+' días','+4.1% vs periodo ant.','up',1],
+    ['OTIF',fmt(a.otif,1)+'%','meta 95%',(a.otif>=95?'+':'−')+fmt(Math.abs(a.otif-95),1)+' pts vs meta',a.otif>=95?'up':'down',2],
+    ['Primer intento',fmt(a.fa,1)+'%','meta 90%',(a.fa>=90?'+':'−')+fmt(Math.abs(a.fa-90),1)+' pts vs meta',a.fa>=90?'up':'down',3],
+    ['Costo por entrega','$'+fmt(a.cpe,1),'tarifa prom. $'+TARIFA,fmt(a.cpe/TARIFA*100,0)+'% de la tarifa',a.cpe/TARIFA<=.7?'up':'down',4],
+    ['Km recorridos',fmt(Math.round(km*per)),fmt(va.kpe,1)+' km por entrega','−2.3% km/entrega','up',5],
+    ['CSAT destinatario',fmt(a.csat,2),'escala 1–5','+0.04 vs periodo ant.','up',6]
+  ];
+  $('#tiles').innerHTML=T.map(t=>`<div class="tile"><span class="k">${t[0]}</span><span class="v">${t[1]}</span><span class="d flat">${t[2]}</span><span class="d ${t[4]}">${t[3]}</span>${spark(t[5]*7+per,t[4]==='up')}</div>`).join('');
+}
+
+/* ---------- Mapa ---------- */
+const svgNS='http://www.w3.org/2000/svg';
+const map=$('#map'); map.setAttribute('viewBox',`-10 -10 ${MAP.W+20} ${MAP.H+20}`);
+const gS=document.createElementNS(svgNS,'g'), gF=document.createElementNS(svgNS,'g'), gH=document.createElementNS(svgNS,'g');
+map.append(gS,gF,gH);
+for(const k in MAP.states){const p=document.createElementNS(svgNS,'path');p.setAttribute('d',MAP.states[k].d);p.dataset.k=k;p.classList.add('st');if(!WEIGHT[k])p.classList.add('nc');gS.append(p)}
+const C0=MAP.cities.CDMX;
+function drawFlows(){
+  gF.innerHTML='';gH.innerHTML='';
+  const rs=rows(), max=Math.max(...rs.map(r=>r.vol));
+  if($('#flows').checked){
+    rs.filter(r=>r.k!=='df').forEach(r=>{const c=MAP.cities[HUB[r.k]];const mx=(C0[0]+c[0])/2, my=(C0[1]+c[1])/2, dx=c[0]-C0[0], dy=c[1]-C0[1];
+      const cx=mx-dy*.18, cy=my+dx*.18;const p=document.createElementNS(svgNS,'path');p.setAttribute('d',`M${C0[0]},${C0[1]}Q${cx},${cy} ${c[0]},${c[1]}`);p.setAttribute('class','flow anim');p.setAttribute('stroke-width',(0.8+3.2*r.vol/max).toFixed(2));gF.append(p)});
+  }
+  rs.forEach(r=>{const c=MAP.cities[HUB[r.k]];const ci=document.createElementNS(svgNS,'circle');ci.setAttribute('cx',c[0]);ci.setAttribute('cy',c[1]);ci.setAttribute('r',r.k==='df'?7:3.6+4*r.vol/max);ci.setAttribute('class','hub'+(r.k==='df'?' main':''));gH.append(ci);
+    if(r.vol/max>.18||r.k==='df'){const t=document.createElementNS(svgNS,'text');t.setAttribute('x',c[0]+9);t.setAttribute('y',c[1]+3);t.setAttribute('class','maplbl');t.textContent=HUB[r.k];gH.append(t)}});
+}
+const RAMP=['--m1','--m2','--m3','--m4','--m5'];
+function colorFor(m,v,vals){const sorted=[...vals].sort((a,b)=>a-b);let t=sorted.indexOf(v)/Math.max(1,sorted.length-1);if(!METRICS[m].hi)t=1-t;return css(RAMP[Math.min(4,Math.floor(t*5))])}
+function drawMap(){
+  const rs=rows(), m=state.metric, vals=rs.map(r=>r[m]), min=Math.min(...vals), max=Math.max(...vals);
+  const byK=Object.fromEntries(rs.map(r=>[r.k,r]));
+  gS.querySelectorAll('.st').forEach(p=>{const k=p.dataset.k;p.classList.toggle('sel',state.sel===k);
+    if(!WEIGHT[k]){return}
+    if(!byK[k]){p.classList.add('dim');p.style.fill=css('--m2');return}
+    p.classList.remove('dim');p.style.fill=colorFor(m,byK[k][m],vals)});
+  drawFlows();
+  const M=METRICS[m];
+  $('#legend').innerHTML=`<span>Quintil: ${M.hi?'bajo':'alto'} ${M.n.toLowerCase()}</span><span class="ramp">${RAMP.map(v=>`<i style="background:var(${v})"></i>`).join('')}</span><span>${M.hi?'Alto':'Bajo'}</span><span style="margin-left:6px">Mejor desempeño = más oscuro</span>`;
+  $('#metricT').innerHTML=Object.entries(METRICS).map(([k,v])=>`<button type="button" data-m="${k}" aria-pressed="${k===m}">${v.n}</button>`).join('');
+  drawRank(rs);
+}
+function drawRank(rs){
+  const m=state.metric, M=METRICS[m];
+  const sorted=[...rs].sort((a,b)=>M.hi?a[m]-b[m]:b[m]-a[m]).slice(0,8);
+  const vs=rs.map(r=>r[m]), max=Math.max(...vs), mn=Math.min(...vs), lo=m==='vol'?0:mn-(max-mn)*.35;
+  $('#rankTitle').textContent=m==='vol'?'Estados con mayor volumen':'Estados con peor '+M.n.toLowerCase();
+  if(m==='vol')sorted.reverse();
+  const list=m==='vol'?[...rs].sort((a,b)=>b.vol-a.vol).slice(0,8):sorted;
+  $('#rankSub').textContent=M.u;
+  $('#rank').innerHTML=list.map(r=>`<div class="r" data-k="${r.k}" role="button" tabindex="0"><span>${r.n}</span><span class="bar"><i style="width:${((r[m]-lo)/(max-lo)*100).toFixed(1)}%;background:var(${m==='vol'?'--teal':'--crit'})"></i></span><span>${M.f(r[m])}</span></div>`).join('');
+}
+function drawDetail(){
+  const k=state.sel;$('#detailWrap').hidden=!k;$('#rank').hidden=!!k;$('#rankTitle').parentElement.hidden=!!k;
+  if(!k)return;
+  const r=rows().find(x=>x.k===k); if(!r){state.sel=null;return drawDetail()}
+  $('#dTitle').textContent=r.n+' · plaza '+HUB[k];
+  const items=[['Entregas/día',fmt(r.vol)],['OTIF',fmt(r.otif,1)+'%'],['Primer intento',fmt(r.fa,1)+'%'],['Costo/entrega','$'+fmt(r.cpe,1)],['Incidencias ‰',fmt(r.inc,2)],['CSAT',fmt(r.csat,2)]];
+  $('#detail').innerHTML=items.map(i=>`<div><small>${i[0]}</small><b>${i[1]}</b></div>`).join('');
+}
+const tip=$('#tip');
+map.addEventListener('mousemove',e=>{const p=e.target.closest('.st');if(!p){tip.hidden=true;return}
+  const k=p.dataset.k, r=rows().find(x=>x.k===k), box=$('#mapbox').getBoundingClientRect();
+  tip.innerHTML=r?`<b>${r.n}</b> · ${METRICS[state.metric].n}: ${METRICS[state.metric].f(r[state.metric])}`:`<b>${MAP.states[k].n}</b> · ${WEIGHT[k]?'fuera del filtro':'sin cobertura · oportunidad'}`;
+  tip.style.left=(e.clientX-box.left)+'px';tip.style.top=(e.clientY-box.top)+'px';tip.hidden=false});
+map.addEventListener('mouseleave',()=>tip.hidden=true);
+map.addEventListener('click',e=>{const p=e.target.closest('.st');if(p&&WEIGHT[p.dataset.k]&&rows().some(r=>r.k===p.dataset.k)){state.sel=state.sel===p.dataset.k?null:p.dataset.k;drawMap();drawDetail()}});
+$('#rank').addEventListener('click',e=>{const r=e.target.closest('.r');if(r){state.sel=r.dataset.k;drawMap();drawDetail()}});
+$('#rank').addEventListener('keydown',e=>{if(e.key==='Enter'){const r=e.target.closest('.r');if(r){state.sel=r.dataset.k;drawMap();drawDetail()}}});
+$('#dClose').addEventListener('click',()=>{state.sel=null;drawMap();drawDetail()});
+$('#metricT').addEventListener('click',e=>{const b=e.target.closest('button');if(b){state.metric=b.dataset.m;drawMap()}});
+$('#flows').addEventListener('change',drawFlows);
+
+/* ---------- Alertas ---------- */
+function drawAlerts(){
+  const rs=rows(), out=[];
+  rs.forEach(r=>{
+    if(r.fa<85)out.push(['crit',`${r.n}: primer intento ${fmt(r.fa,1)}%`,'Re-sectorizar y confirmar por WhatsApp',r.fa]);
+    if(r.otif<90)out.push(['crit',`${r.n}: OTIF ${fmt(r.otif,1)}%`,'Apoyo de operadores desde plaza vecina',r.otif]);
+    if(r.inc>3)out.push(['crit',`${r.n}: ${fmt(r.inc,1)} incidencias por mil`,'Auditoría de rutas en zona de riesgo',0]);
+    if(r.cpe/TARIFA>.85)out.push(['warn',`${r.n}: costo por entrega ${fmt(r.cpe/TARIFA*100,0)}% de la tarifa`,'Revisar mezcla de vehículos',50]);
+  });
+  if(state.reg==='all'||state.reg==='C')out.push(['warn','CEDIS Vallejo: rezago de 1,240 envíos al cierre','Abrir turno vespertino',60]);
+  out.push(['good','Puebla: 1,870 envíos/mes de clientes actuales sin cobertura','Evaluar apertura de plaza',99]);
+  $('#alerts').innerHTML=out.slice(0,5).map(a=>`<div class="alert" style="--sev:var(--${a[0]})"><div><div>${a[1]}</div><div class="act">→ ${a[2]}</div></div></div>`).join('');
+}
+
+/* ---------- Gráficas ---------- */
+function axisY(svg,ticks,y,x0,x1,f){return ticks.map(t=>`<line class="gridl" x1="${x0}" x2="${x1}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${x0-4}" y="${y(t)+3}" text-anchor="end">${f(t)}</text>`).join('')}
+function drawTrend(){
+  const rs=rows(), tot=rs.reduce((a,r)=>a+r.vol,0), va=vehAdj();
+  const s=Array.from({length:30},(_,i)=>rs.reduce((a,r)=>a+ST[r.k].trend[i]*r.vol,0)/tot+va.otif);
+  const x0=34,x1=312,y0=140,y1=10,lo=88,hi=100;const x=i=>x0+i*(x1-x0)/29, y=v=>y0-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(y0-y1);
+  const d=s.map((v,i)=>(i?'L':'M')+x(i).toFixed(1)+','+y(v).toFixed(1)).join('');
+  $('#cTrend').innerHTML=axisY(null,[88,91,94,97,100],y,x0,x1,t=>t+'%')+
+    `<path d="${d}L${x1},${y0}L${x0},${y0}Z" fill="var(--teal-soft)"/><path d="${d}" fill="none" stroke="var(--teal)" stroke-width="2"/>`+
+    `<line x1="${x0}" x2="${x1}" y1="${y(95)}" y2="${y(95)}" stroke="var(--accent)" stroke-dasharray="4 3" stroke-width="1.5"/><text class="axis" x="${x1}" y="${y(95)-4}" text-anchor="end" style="fill:var(--accent)">meta 95%</text>`+
+    `<circle cx="${x(29)}" cy="${y(s[29])}" r="3.5" fill="var(--teal)"/><text class="axis" x="${x0}" y="156">hace 30 d</text><text class="axis" x="${x1}" y="156" text-anchor="end">hoy</text>`;
+}
+function drawHour(){
+  const hrs=Array.from({length:14},(_,i)=>i+8), r=rng(9);
+  const vals=hrs.map(h=>Math.max(0,Math.exp(-((h-12.5)**2)/6)*100+Math.exp(-((h-17)**2)/4)*55+r()*8));
+  const x0=34,x1=312,y0=140,y1=10,max=Math.max(...vals),bw=(x1-x0)/vals.length;const y=v=>y0-v/max*(y0-y1);
+  $('#cHour').innerHTML=axisY(null,[0,max/2,max],y,x0,x1,t=>Math.round(t/max*100)+'%')+vals.map((v,i)=>`<rect x="${(x0+i*bw+2).toFixed(1)}" y="${y(v).toFixed(1)}" width="${(bw-4).toFixed(1)}" height="${(y0-y(v)).toFixed(1)}" fill="${hrs[i]>=12&&hrs[i]<=13?'var(--accent)':'var(--teal)'}" rx="1"/>`).join('')+
+    hrs.filter((h,i)=>i%2===0).map((h,j)=>`<text class="axis" x="${(x0+j*2*bw+bw/2).toFixed(1)}" y="156" text-anchor="middle">${h}h</text>`).join('');
+}
+function drawVeh(){
+  const ks=Object.keys(VEH), x0=72,x1=300,max=80, x=v=>x0+v/max*(x1-x0);
+  $('#cVeh').innerHTML=[0,20,40,60,80].map(t=>`<line class="gridl" x1="${x(t)}" x2="${x(t)}" y1="8" y2="132"/><text class="axis" x="${x(t)}" y="146" text-anchor="middle">$${t}</text>`).join('')+
+    ks.map((k,i)=>{const v=VEH[k].cpe, yy=14+i*30, on=state.veh==='all'||state.veh===k;return `<text class="axis" x="${x0-6}" y="${yy+12}" text-anchor="end" style="fill:var(--fg)">${VEH[k].n}</text><rect x="${x0}" y="${yy}" width="${x(v)-x0}" height="16" fill="var(--teal)" opacity="${on?1:.3}" rx="1"/><text class="axis" x="${x(v)+4}" y="${yy+12}" style="fill:var(--fg)">$${v}</text>`}).join('')+
+    `<line x1="${x(TARIFA)}" x2="${x(TARIFA)}" y1="6" y2="134" stroke="var(--accent)" stroke-dasharray="4 3" stroke-width="1.5"/><text class="axis" x="${x(TARIFA)-4}" y="158" text-anchor="end" style="fill:var(--accent)">tarifa $${TARIFA}</text>`;
+}
+
+/* ---------- Hex urbano ---------- */
+const HEX=(()=>{const r=rng(77), out=[], s=11, w=Math.sqrt(3)*s, h=1.5*s;
+  const centers=[[300,165,1],[230,110,.7],[390,120,.6],[420,230,.8],[180,220,.55],[330,260,.5],[500,175,.45]];
+  for(let row=0;row*h<330;row++)for(let col=0;col*w<640;col++){
+    const cx=col*w+(row%2?w/2:0)+10, cy=row*h+12;
+    const ex=((cx-320)/300)**2+((cy-170)/150)**2; if(ex>1+r()*.12)continue;
+    let d=0;centers.forEach(([x,y,a])=>{d+=a*Math.exp(-((cx-x)**2+(cy-y)**2)/(2*65**2))});
+    const fail=Math.min(1,(.05+r()*.07+(Math.exp(-((cx-430)**2+(cy-240)**2)/(2*45**2))*.22)+(Math.exp(-((cx-175)**2+(cy-215)**2)/(2*35**2))*.16)));
+    out.push({cx,cy,d:d*(0.85+r()*.3),f:fail});
+  }return out})();
+function hexPath(cx,cy,s){let p='';for(let i=0;i<6;i++){const a=Math.PI/180*(60*i-30);p+=(i?'L':'M')+(cx+s*Math.cos(a)).toFixed(1)+','+(cy+s*Math.sin(a)).toFixed(1)}return p+'Z'}
+const HEXL={vol:{n:'Densidad de entregas',f:h=>h.d,mx:Math.max(...HEX.map(h=>h.d))},fail:{n:'Intentos fallidos',f:h=>h.f,mx:Math.max(...HEX.map(h=>h.f))}};
+function drawHex(){
+  const L=HEXL[state.hex], fail=state.hex==='fail';
+  const rampF=['--m1','--accent-soft','--warn','--accent','--crit'];
+  const ramp=fail?rampF:RAMP;
+  $('#hexmap').innerHTML=HEX.map(h=>{const t=L.f(h)/L.mx;return `<path class="hex" d="${hexPath(h.cx,h.cy,10.6)}" fill="var(${ramp[Math.min(4,Math.floor(t*5))]})"/>`}).join('')+
+    [['Norte',300,40],['Poniente',90,175],['Oriente',560,175],['Sur',320,318]].map(l=>`<text class="axis" x="${l[1]}" y="${l[2]}" text-anchor="middle" style="fill:var(--fg);font-size:11px">${l[0]}</text>`).join('')+
+    (fail?`<circle cx="430" cy="240" r="48" fill="none" stroke="var(--crit)" stroke-width="1.5" stroke-dasharray="4 3"/><text class="axis" x="482" y="290" style="fill:var(--crit)">Foco: 14% fallidos</text>`:'');
+  $('#hexT').innerHTML=Object.entries(HEXL).map(([k,v])=>`<button type="button" data-h="${k}" aria-pressed="${k===state.hex}">${v.n}</button>`).join('');
+  $('#hexLegend').innerHTML=`<span>Bajo</span><span class="ramp">${ramp.map(v=>`<i style="background:var(${v})"></i>`).join('')}</span><span>Alto</span><span style="margin-left:6px">${fail?'Fallidos ÷ intentos por celda. Decide dónde confirmar citas o instalar lockers.':'Entregas por celda. Decide dónde ubicar micro-hubs y cómo sectorizar rutas.'}</span>`;
+}
+$('#hexT').addEventListener('click',e=>{const b=e.target.closest('button');if(b){state.hex=b.dataset.h;drawHex()}});
+
+/* ---------- Clientes ---------- */
+function drawClients(){
+  const r=rng(5+state.per), a=agg(rows());
+  const C=[['E-commerce A',.29],['Supermercado B',.21],['E-commerce C',.15],['Supermercado D',.13],['Centro comercial E',.1],['Centro comercial F',.06]];
+  $('#clients').innerHTML='<thead><tr><th>Cliente</th><th>Envíos</th><th>SLA</th><th>OTIF</th></tr></thead><tbody>'+C.map(([n,s])=>{const o=a.otif+1.6+(r()-.5)*4.5, sla=o>=95?'good':o>=92?'warn':'crit';
+    return `<tr><td>${n}</td><td class="num">${fmt(Math.round(a.vol*s*state.per))}</td><td><span class="tag" style="background:var(--sunk);color:var(--${sla})">${sla==='good'?'Cumple':sla==='warn'?'En riesgo':'Incumple'}</span></td><td class="num">${fmt(o,1)}%</td></tr>`}).join('')+'</tbody>';
+}
+
+function all(){drawTiles();drawMap();drawDetail();drawAlerts();drawTrend();drawHour();drawVeh();drawHex();drawClients()}
+['fPer','fReg','fVeh'].forEach(id=>$('#'+id).addEventListener('change',e=>{state.per=+$('#fPer').value;state.reg=$('#fReg').value;state.veh=$('#fVeh').value;if(state.sel&&!rows().some(r=>r.k===state.sel))state.sel=null;all()}));
+all();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',all);
+new MutationObserver(all).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+</script>
+
+</body>
+</html>
