@@ -6,6 +6,7 @@
 <meta name="description" content="Propuesta de sistema de indicadores de control y toma de decisiones para Servicio Integral BETA: módulos de captura, KPIs, tableros y mapas.">
 <meta property="og:title" content="Torre de Control BETA">
 <meta property="og:description" content="Sistema de indicadores y toma de decisiones para última milla.">
+<script>try{var t=localStorage.getItem('beta-theme');if(t==='dark'||t==='light')document.documentElement.dataset.theme=t}catch(e){}</script>
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
 <title>Torre de Control BETA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -55,6 +56,9 @@ button{font:inherit}
 .brand i{display:inline-block;width:10px;height:10px;background:var(--accent);transform:rotate(45deg)}
 .nav a{color:var(--muted);text-decoration:none;font-size:13px;white-space:nowrap}
 .nav a:hover{color:var(--fg)}
+.theme-btn{margin-left:auto;flex:none;display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--sunk);color:var(--fg);border-radius:99px;padding:5px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.theme-btn:hover{border-color:var(--fg)}
+.theme-btn svg{width:15px;height:15px}
 
 /* hero */
 .hero{padding-block:56px 40px;border-bottom:1px solid var(--line)}
@@ -68,6 +72,7 @@ button{font:inherit}
 .barcode{height:34px;margin:10px 14px 12px;background:repeating-linear-gradient(90deg,var(--fg) 0 2px,transparent 2px 4px,var(--fg) 4px 5px,transparent 5px 9px,var(--fg) 9px 12px,transparent 12px 13px)}
 
 section.block{padding-block:56px}
+section{scroll-margin-top:calc(56px + env(safe-area-inset-top,0px))}
 section.block+section.block{border-top:1px solid var(--line)}
 .sec-head{display:grid;gap:10px;margin-bottom:28px}
 
@@ -316,6 +321,7 @@ footer a{color:var(--teal)}
     <a href="#demo">Tablero demo</a>
     <a href="#decisiones">Decisiones</a>
     <a href="#ruta">Hoja de ruta</a>
+    <button type="button" class="theme-btn" id="themeBtn" aria-label="Cambiar entre modo claro y oscuro"></button>
   </div>
 </nav>
 
@@ -966,6 +972,15 @@ function drawClients(){
 function all(){drawTiles();drawPulse();drawMap();drawDetail();drawAlerts();drawTrend();drawHour();drawPareto();drawFc();drawHeat();drawVeh();drawOcc();drawProd();drawHex();drawRoutes();drawClients()}
 ['fPer','fReg','fSeg','fVeh'].forEach(id=>$('#'+id).addEventListener('change',()=>{state.per=+$('#fPer').value;state.reg=$('#fReg').value;state.seg=$('#fSeg').value;state.veh=$('#fVeh').value;all()}));
 drawKpis();drawNS();drawSLA();all();
+/* ---------- Modo claro / oscuro ---------- */
+const root=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
+const SUN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+const MOON='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
+const isDark=()=>root.dataset.theme?root.dataset.theme==='dark':mq.matches;
+function paintBtn(){const d=isDark();$('#themeBtn').innerHTML=(d?SUN:MOON)+(d?'Modo claro':'Modo oscuro');$('#themeBtn').setAttribute('aria-pressed',d)}
+try{const saved=localStorage.getItem('beta-theme');if(saved==='dark'||saved==='light')root.dataset.theme=saved}catch(e){}
+$('#themeBtn').addEventListener('click',()=>{const next=isDark()?'light':'dark';root.dataset.theme=next;try{localStorage.setItem('beta-theme',next)}catch(e){}paintBtn()});
+mq.addEventListener('change',paintBtn);paintBtn();
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{drawMap();drawHex()});
 new MutationObserver(()=>{drawMap();drawHex()}).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 </script>
