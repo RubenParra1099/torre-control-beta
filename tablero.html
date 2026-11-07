@@ -684,7 +684,7 @@ const HUB={df:'CDMX',mx:'Toluca',ja:'Guadalajara',nl:'Monterrey',gj:'León',ve:'
 const WEIGHT={df:18,mx:14,ja:9,nl:9,gj:4,ve:4,bc:4,ch:3.5,so:2.5,si:2.5,tm:3,co:3,mi:3,yu:2,qr:2.5,oa:1.5,cs:1.5,gr:1.5,dg:1,za:1,na:1,cl:.7,bs:.8,cm:.6};
 const VEH={moto:{n:'Moto',share:.34,cpe:38,kpe:2.6,otif:.6,occ:84},sedan:{n:'Sedán',share:.22,cpe:52,kpe:3.6,otif:0,occ:71},svan:{n:'Small van',share:.28,cpe:46,kpe:4.1,otif:.3,occ:78},lvan:{n:'Large van',share:.16,cpe:41,kpe:5.4,otif:-.8,occ:66}};
 const TARIFA=68, BASE=38000;
-const R=rng(42), ST={};
+const R=rng(42), ST={}, CH={};
 const TOT=Object.values(WEIGHT).reduce((a,b)=>a+b,0);
 for(const k in WEIGHT){
   const reg=regionOf(k), remote=reg==='S'?1:reg==='N'?.5:0;
@@ -723,7 +723,7 @@ function drawTiles(){
 function drawPulse(){
   const a=agg(scope()),tot=Math.round(a.vol*1.04);
   const P=[['Recibidos sin clasificar',.04,'--m2'],['En CEDIS',.09,'--m3'],['En ruta',.27,'--m4'],['Entregados',.551,'--teal'],['Fallidos / reprogramados',.035,'--warn'],['Devueltos al aliado',.014,'--crit']];
-  $('#pulseSub').textContent=fmt(tot)+' envíos programados hoy';
+  CH.pulse={P,tot};$('#pulseSub').textContent=fmt(tot)+' envíos programados hoy';
   $('#pipe').innerHTML=P.map(p=>`<div style="flex:${p[1]};background:var(${p[2]})" data-t="${p[0]}: <b>${fmt(Math.round(tot*p[1]))}</b> (${fmt(p[1]*100,1)}%)">${p[1]>.08?fmt(p[1]*100,0)+'%':''}</div>`).join('');
   $('#pipeL').innerHTML=P.map(p=>`<div><small><i style="background:var(${p[2]})"></i>${p[0]}</small><b>${fmt(Math.round(tot*p[1]))}</b></div>`).join('');
 }
@@ -801,7 +801,7 @@ function drawTrend(){
   const rs=scope(),tot=rs.reduce((a,r)=>a+r.vol,0),base=Array.from({length:30},(_,i)=>rs.reduce((a,r)=>a+ST[r.k].trend[i]*r.vol,0)/tot);
   const LV={sup:96.1,eco:92.4,cc:98.3},avg=base.reduce((a,b)=>a+b,0)/30,va=adj(),dl=state.sel?agg(rs).otif-agg(rows()).otif:0;
   const series=Object.entries(SEG).map(([k,s],j)=>{const r=rng(20+j);return{k,n:s.n,sh:{sup:'Súper',eco:'E-com',cc:'C. com.'}[k],col:s.col,vals:base.map(v=>Math.min(99.6,v-avg+LV[k]+dl+(va.otif-s.otif*(state.seg===k?1:0))*0+(r()-.5)*.9))}});
-  const show=state.seg==='all'?series:series.filter(s=>s.k===state.seg);
+  const show=state.seg==='all'?series:series.filter(s=>s.k===state.seg);CH.trend=show;
   const x0=34,x1=250,y0=146,y1=10,lo=88,hi=100,x=i=>x0+i*(x1-x0)/29,y=v=>y0-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*(y0-y1);
   const svg=$('#cTrend');
   svg.innerHTML=yAxis([88,91,94,97,100],y,x0,x1,t=>t+'%')+`<line x1="${x0}" x2="${x1}" y1="${y(95)}" y2="${y(95)}" stroke="var(--fg)" stroke-dasharray="4 3" stroke-width="1.2" opacity=".7"/>`+
@@ -816,7 +816,7 @@ function drawHour(){
   const hrs=Array.from({length:14},(_,i)=>i+8),r=rng(9+sseed()),a=agg(scope());
   const tot=hrs.map(h=>Math.max(2,Math.exp(-((h-12.5)**2)/6)*100+Math.exp(-((h-17)**2)/4)*55+r()*8));
   const late=tot.map((v,i)=>v*(hrs[i]>=17?.14:hrs[i]>=12&&hrs[i]<=14?.09:.04));
-  const x0=34,x1=312,y0=146,y1=10,max=Math.max(...tot),bw=(x1-x0)/14,y=v=>y0-v/max*(y0-y1),scale=a.vol/tot.reduce((s,v)=>s+v,0);
+  const x0=34,x1=312,y0=146,y1=10,max=Math.max(...tot),bw=(x1-x0)/14,y=v=>y0-v/max*(y0-y1),scale=a.vol/tot.reduce((s,v)=>s+v,0);CH.hour={hrs,tot,late,scale};
   $('#cHour').innerHTML=yAxis([0,max/2,max],y,x0,x1,t=>fmt(Math.round(t*scale/10)*10))+tot.map((v,i)=>{const on=v-late[i],bx=(x0+i*bw+2).toFixed(1),w=(bw-4).toFixed(1);
     return `<g data-t="<b>${hrs[i]}:00–${hrs[i]+1}:00</b><br>A tiempo: ${fmt(on*scale)}<br>Fuera de ventana: ${fmt(late[i]*scale)} (${fmt(late[i]/v*100,0)}%)"><rect x="${bx}" y="${y(on)}" width="${w}" height="${(y0-y(on)).toFixed(1)}" fill="var(--teal)"/><rect x="${bx}" y="${y(v)}" width="${w}" height="${Math.max(0,y(on)-y(v)-2).toFixed(1)}" fill="var(--warn)" rx="2"/></g>`}).join('')+
     hrs.filter((h,i)=>i%2===0).map((h,j)=>`<text class="axis" x="${(x0+j*2*bw+bw/2).toFixed(1)}" y="162" text-anchor="middle">${h}h</text>`).join('');
@@ -826,7 +826,7 @@ function drawPareto(){
   if(state.seg==='sup'){base[0][1]=31;base[2][1]=22}if(state.seg==='cc'){base[3][1]=24;base[0][1]=20}
   if(state.sel){const q=rng(sseed());base.forEach(b=>b[1]*=.6+q()*.8)}
   const SH={'Destinatario ausente':'Ausente','Dirección incorrecta':'Direcc.','Rechazo del destinatario':'Rechazo','Negocio cerrado':'Cerrado','Zona de riesgo / acceso':'Riesgo','Reprogramado':'Reprog.','Otro':'Otro'};
-  const t=base.reduce((a,b)=>a+b[1],0),d=base.map(b=>[b[0],b[1]/t*100]).sort((a,b)=>b[1]-a[1]);let c=0;const cum=d.map(b=>c+=b[1]);
+  const t=base.reduce((a,b)=>a+b[1],0),d=base.map(b=>[b[0],b[1]/t*100]).sort((a,b)=>b[1]-a[1]);let c=0;const cum=d.map(b=>c+=b[1]);CH.pareto={d,cum};
   const x0=34,x1=312,y0=140,y1=10,bw=(x1-x0)/d.length,y=v=>y0-v/100*(y0-y1),cx=i=>x0+i*bw+bw/2;
   $('#cPareto').innerHTML=yAxis([0,50,100],y,x0,x1,v=>v+'%')+d.map((b,i)=>`<rect x="${(x0+i*bw+3).toFixed(1)}" y="${y(b[1])}" width="${(bw-6).toFixed(1)}" height="${(y0-y(b[1])).toFixed(1)}" fill="var(--teal)" rx="2" data-t="<b>${b[0]}</b><br>${fmt(b[1],1)}% de fallidos · acumulado ${fmt(cum[i],0)}%"/>`).join('')+
     `<path d="${cum.map((v,i)=>(i?'L':'M')+cx(i).toFixed(1)+','+y(v).toFixed(1)).join('')}" fill="none" stroke="var(--fg)" stroke-width="1.6"/>`+cum.map((v,i)=>`<circle cx="${cx(i)}" cy="${y(v)}" r="3" fill="var(--fg)" stroke="var(--surface)" stroke-width="1.5"/>`).join('')+
@@ -839,7 +839,7 @@ function drawFc(){
   const x0=48,x1=548,y0=180,y1=12,max=Math.max(...days.map(d=>Math.max(d.hi,d.cap)))*1.05,x=i=>x0+i*(x1-x0)/13,y=v=>y0-v/max*(y0-y1);
   const band=days.map((d,i)=>(i?'L':'M')+x(i)+','+y(d.hi)).join('')+days.slice().reverse().map((d,j)=>'L'+x(13-j)+','+y(d.lo)).join('')+'Z';
   const capP=days.map((d,i)=>(i?'L':'M')+x(i)+','+y(d.cap)).join(''),mP=days.map((d,i)=>(i?'L':'M')+x(i)+','+y(d.m)).join('');
-  const over=days.map((d,i)=>({...d,i})).filter(d=>d.hi>d.cap);const pi=days.findIndex(d=>d.peak);
+  CH.fc=days;const over=days.map((d,i)=>({...d,i})).filter(d=>d.hi>d.cap);const pi=days.findIndex(d=>d.peak);
   const unit=Math.pow(10,Math.floor(Math.log10(max/3))),ticks=[0,max/3,2*max/3].map(v=>Math.round(v/unit)*unit);
   const svg=$('#cFc');
   svg.innerHTML=`<rect x="${x(pi)-12}" y="${y1}" width="${x(pi+3)-x(pi)+24}" height="${y0-y1}" fill="var(--accent-soft)" opacity=".7"/><text class="axis halo" x="${x(pi)-8}" y="${y0-6}" style="fill:var(--accent)">Campaña de descuentos (ej.)</text>`+
@@ -853,7 +853,7 @@ function drawFc(){
 function drawHeat(){
   const dn=['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'],wk=[1.18,1.08,1.02,1,1.05,.9,.72],hrs=Array.from({length:14},(_,i)=>i+8),r=rng(13+sseed()),a=agg(scope());
   const vals=dn.map((d,di)=>hrs.map(h=>(Math.exp(-((h-12.5)**2)/6)+Math.exp(-((h-(di>=5?11:17))**2)/4)*.55+.05)*wk[di]*(0.9+r()*.2)));
-  const mx=Math.max(...vals.flat()),tot=vals.flat().reduce((s,v)=>s+v,0),sc=a.vol*7/tot;
+  const mx=Math.max(...vals.flat()),tot=vals.flat().reduce((s,v)=>s+v,0),sc=a.vol*7/tot;CH.heat={dn,hrs,vals,sc};
   const x0=40,cw=(410-x0)/14,ch=26;
   $('#cHeat').innerHTML=vals.map((row,di)=>`<text class="axis" x="${x0-6}" y="${8+di*ch+ch/2+3}" text-anchor="end">${dn[di]}</text>`+row.map((v,hi)=>`<rect x="${(x0+hi*cw).toFixed(1)}" y="${8+di*ch}" width="${(cw-2).toFixed(1)}" height="${ch-2}" rx="2" fill="var(${RAMP[Math.min(4,Math.floor(v/mx*5))]})" data-t="<b>${dn[di]} ${hrs[hi]}:00</b><br>${fmt(Math.round(v*sc/7*7))} entregas promedio"/>`).join('')).join('')+
     hrs.filter((h,i)=>i%2===0).map((h,j)=>`<text class="axis" x="${(x0+j*2*cw+cw/2).toFixed(1)}" y="${8+7*ch+12}" text-anchor="middle">${h}h</text>`).join('');
@@ -866,7 +866,7 @@ function drawVeh(){
 }
 function drawOcc(){
   const q=rng(40+sseed()),OC=Object.fromEntries(Object.keys(VEH).map(k=>[k,Math.round(Math.min(97,VEH[k].occ+(state.sel?(q()-.5)*16:0)))]));
-  const ks=Object.keys(VEH),x0=72,x1=296,x=v=>x0+v/100*(x1-x0);
+  CH.occ=OC;const ks=Object.keys(VEH),x0=72,x1=296,x=v=>x0+v/100*(x1-x0);
   $('#cOcc').innerHTML=[0,25,50,75,100].map(t=>`<line class="gridl" x1="${x(t)}" x2="${x(t)}" y1="8" y2="132"/><text class="axis" x="${x(t)}" y="146" text-anchor="middle">${t}%</text>`).join('')+
     ks.map((k,i)=>{const v=OC[k],yy=14+i*30,s=v>=80?'teal':v>=70?'warn':'crit',on=state.veh==='all'||state.veh===k;return `<text class="axis fg" x="${x0-6}" y="${yy+12}" text-anchor="end">${VEH[k].n}</text><rect x="${x0}" y="${yy}" width="${x(v)-x0}" height="16" fill="var(--${s})" opacity="${on?1:.3}" rx="2" data-t="<b>${VEH[k].n}</b><br>Ocupación ${v}% · meta 80%"/><text class="axis fg" x="${x(v)+4}" y="${yy+12}">${v}%</text>`}).join('')+
     `<line x1="${x(80)}" x2="${x(80)}" y1="6" y2="134" stroke="var(--fg)" stroke-dasharray="4 3" stroke-width="1.2"/><text class="axis fg" x="${x(80)+4}" y="162">meta 80%</text>`;
@@ -874,7 +874,7 @@ function drawOcc(){
 function drawProd(){
   const bins=[3,4,5,6,7,8,9,10,11,12,13],c0=[22,48,96,168,231,244,198,142,88,41,17],sh=state.sel?Math.round((88-ST[state.sel].fa)/3):0,fct=state.sel?ST[state.sel].vol/BASE*1.05:1;
   const cnt=c0.map((c,i)=>Math.max(state.sel?0:1,Math.round(c0[Math.max(0,Math.min(10,i+sh))]*fct)));
-  const tot=cnt.reduce((a,b)=>a+b,0),under=cnt.slice(0,3).reduce((a,b)=>a+b,0),x0=34,x1=312,y0=140,y1=14,mx=Math.max(...cnt)*1.12,bw=(x1-x0)/bins.length,y=v=>y0-v/mx*(y0-y1);
+  CH.prod={bins,cnt};const tot=cnt.reduce((a,b)=>a+b,0),under=cnt.slice(0,3).reduce((a,b)=>a+b,0),x0=34,x1=312,y0=140,y1=14,mx=Math.max(...cnt)*1.12,bw=(x1-x0)/bins.length,y=v=>y0-v/mx*(y0-y1);
   $('#cProd').innerHTML=yAxis([0,Math.round(mx/2.4),Math.round(mx/1.2)],y,x0,x1,v=>v)+cnt.map((c,i)=>`<rect x="${(x0+i*bw+2).toFixed(1)}" y="${y(c)}" width="${(bw-4).toFixed(1)}" height="${(y0-y(c)).toFixed(1)}" fill="var(--${bins[i]<6?'warn':'teal'})" rx="2" data-t="<b>${bins[i]}–${bins[i]+1} paradas/h</b><br>${c} operadores"/>`).join('')+
     bins.map((b,i)=>`<text class="axis" x="${(x0+i*bw+bw/2).toFixed(1)}" y="154" text-anchor="middle">${b}</text>`).join('')+
     `<text class="axis fg" x="${x1}" y="${y1+4}" text-anchor="end">${fmt(tot)} operadores · ${fmt(under/tot*100,0)}% bajo meta</text><text class="axis" x="${x1}" y="168" text-anchor="end">paradas por hora</text>`;
@@ -956,6 +956,10 @@ async function saveFile(name,blob){
 }
 const T=s=>String(s).replace(/≥/g,'>=').replace(/≤/g,'<=').replace(/−/g,'-').replace(/→/g,'->').replace(/₂/g,'2').replace(/‰/g,' por mil').replace(/[✓]/g,'OK').replace(/[^\x00-\xFF–—‘’“”•…€]/g,'');
 const fileDate='2026-11-06';
+const niceMax=v=>{if(v<=0)return 1;const p=Math.pow(10,Math.floor(Math.log10(v)));return Math.ceil(v/p*2)/2*p};
+const PC={ink:[20,33,31],teal:[15,110,104],tealSoft:[211,232,229],warn:[184,125,0],crit:[200,50,43],good:[31,138,76],sup:[0,138,124],eco:[226,87,15],cc:[91,91,214]};
+const CV={'--m2':[180,215,210],'--m3':[111,176,168],'--m4':[47,138,130],'--teal':[15,110,104],'--warn':[184,125,0],'--crit':[200,50,43]};
+const stC=st=>st==='good'?PC.teal:PC[st];
 function makePDF(title,sub,orient='p'){
   if(!window.jspdf){toast('No se pudo cargar el generador de PDF. Revisa tu conexión.');return null}
   const d=new window.jspdf.jsPDF({unit:'pt',format:'letter',orientation:orient}),W=d.internal.pageSize.getWidth(),H=d.internal.pageSize.getHeight(),M=40;let y=0;
@@ -975,6 +979,33 @@ function makePDF(title,sub,orient='p'){
       rows.forEach((r,ri)=>{const cells=r.map((c,i)=>d.splitTextToSize(T(c),cw[i]-6)),h=Math.max(...cells.map(c=>c.length))*10+4;
         if(y+h>H-50){d.addPage();head();drawHead();d.setFont('helvetica','normal');d.setFontSize(8)}
         if(ri%2){d.setFillColor(246,248,247);d.rect(M,y-9,tw,h,'F')}d.setTextColor(...INK);let x=M+4;cells.forEach((c,i)=>{d.text(c,x,y);x+=cw[i]});y+=h});y+=8},
+
+    _axis(x0,yT,w,h,lo,hi,fm,n=4){d.setFont('helvetica','normal');d.setFontSize(7);for(let i=0;i<=n;i++){const v=lo+(hi-lo)*i/n,yy=yT+h-h*i/n;d.setDrawColor(...LINE);d.setLineWidth(.4);d.line(x0,yy,x0+w,yy);d.setTextColor(...MUT);d.text(T(fm(v)),x0-4,yy+2.5,{align:'right'})}},
+    _leg(items){let x=M;d.setFont('helvetica','normal');d.setFontSize(8);items.forEach(([n,c,dash])=>{d.setDrawColor(...c);d.setFillColor(...c);if(dash){d.setLineDashPattern([3,2],0);d.setLineWidth(1.2);d.line(x,y-2.5,x+14,y-2.5);d.setLineDashPattern([],0)}else d.rect(x,y-6,10,7,'F');d.setTextColor(...INK);d.text(T(n),x+(dash?18:14),y);x+=d.getTextWidth(T(n))+(dash?30:26)});y+=14},
+    chartTitle(t,sub){this.ensure(150);d.setFont('helvetica','bold');d.setFontSize(10.5);d.setTextColor(...INK);d.text(T(t),M,y);if(sub){d.setFont('helvetica','normal');d.setFontSize(8);d.setTextColor(...MUT);d.text(T(sub),W-M,y,{align:'right'})}y+=12},
+    line(o){const h=o.h||130,x0=M+38,w=W-M-x0-(o.endLab?54:4),yT=y,lo=o.lo,hi=o.hi,n=o.labels.length,X=i=>x0+i*w/(n-1),Y=v=>yT+h-(Math.max(lo,Math.min(hi,v))-lo)/(hi-lo)*h;
+      this.ensure(h+40);this._axis(x0,yT,w,h,lo,hi,o.fm);
+      if(o.band){d.setFillColor(...o.band.c);const pts=[];o.band.hi.forEach((v,i)=>pts.push([X(i),Y(v)]));o.band.lo.slice().reverse().forEach((v,j)=>pts.push([X(n-1-j),Y(v)]));d.lines(pts.slice(1).map((p,i)=>[p[0]-pts[i][0],p[1]-pts[i][1]]),pts[0][0],pts[0][1],[1,1],'F',true)}
+      if(o.target!=null){d.setDrawColor(...INK);d.setLineWidth(.8);d.setLineDashPattern([3,3],0);d.line(x0,Y(o.target),x0+w,Y(o.target));d.setLineDashPattern([],0);d.setFontSize(7);d.setTextColor(...INK);d.text(T(o.targetLab||'meta'),x0+4,Y(o.target)-3)}
+      const ends=[];o.series.forEach(s=>{d.setDrawColor(...s.c);d.setLineWidth(s.w||1.6);if(s.dash)d.setLineDashPattern([4,3],0);for(let i=1;i<n;i++)d.line(X(i-1),Y(s.v[i-1]),X(i),Y(s.v[i]));d.setLineDashPattern([],0);if(!s.dash){d.setFillColor(...s.c);d.circle(X(n-1),Y(s.v[n-1]),2.4,'F')}ends.push({s,yy:Y(s.v[n-1])})});
+      if(o.endLab){ends.sort((a,b)=>a.yy-b.yy);for(let i=1;i<ends.length;i++)if(ends[i].yy-ends[i-1].yy<9)ends[i].yy=ends[i-1].yy+9;ends.forEach(e=>{d.setFontSize(7.5);d.setTextColor(...INK);d.text(T(o.endLab(e.s)),X(n-1)+5,e.yy+2.5)})}
+      if(o.marks)o.marks.forEach(i=>{d.setFillColor(200,50,43);d.circle(X(i),Y(o.series[0].band?0:o.markV[i]),3,'F')});
+      d.setFontSize(7);d.setTextColor(...MUT);const step=Math.ceil(n/8);o.labels.forEach((l,i)=>{if(i%step===0||i===n-1)d.text(T(l),X(i),yT+h+10,{align:'center'})});y=yT+h+22;if(o.legend)this._leg(o.legend);y+=6},
+    cols(o){const h=o.h||120,x0=M+38,w=W-M-x0-4,yT=y,n=o.labels.length,mx=o.max||niceMax(Math.max(...o.labels.map((_,i)=>o.stacks.reduce((a,s)=>a+s.v[i],0)))*1.05),bw=w/n,Y=v=>yT+h-v/mx*h;
+      this.ensure(h+40);this._axis(x0,yT,w,h,0,mx,o.fm);
+      o.labels.forEach((l,i)=>{let acc=0;o.stacks.forEach(s=>{const v=s.v[i],c=s.cf?s.cf(i):s.c;d.setFillColor(...c);d.rect(x0+i*bw+bw*.15,Y(acc+v),bw*.7,Math.max(.5,Y(acc)-Y(acc+v)),'F');acc+=v})});
+      if(o.line){d.setDrawColor(...INK);d.setLineWidth(1.2);for(let i=1;i<n;i++)d.line(x0+(i-.5)*bw,Y(o.line.v[i-1]),x0+(i+.5)*bw,Y(o.line.v[i]));d.setFillColor(...INK);o.line.v.forEach((v,i)=>d.circle(x0+(i+.5)*bw,Y(v),2,'F'))}
+      if(o.vline!=null){const xx=x0+o.vline*bw;d.setDrawColor(...INK);d.setLineDashPattern([3,3],0);d.setLineWidth(.8);d.line(xx,yT,xx,yT+h);d.setLineDashPattern([],0);d.setFontSize(7);d.setTextColor(...INK);d.text(T(o.vlineLab||''),xx+3,yT+8)}
+      d.setFontSize(7);d.setTextColor(...MUT);const step=Math.ceil(n/14);o.labels.forEach((l,i)=>{if(i%step===0)d.text(T(l),x0+(i+.5)*bw,yT+h+10,{align:'center'})});y=yT+h+22;if(o.legend)this._leg(o.legend);y+=6},
+    stack(items,fm){this.ensure(60);const tw=W-2*M,tot=items.reduce((a,b)=>a+b[1],0);let x=M;items.forEach(([n,v,c])=>{const w=tw*v/tot;d.setFillColor(...c);d.rect(x,y,Math.max(0,w-1.5),18,'F');if(w>34){d.setFontSize(7.5);d.setTextColor(255,255,255);d.text(fmt(v/tot*100,0)+'%',x+w/2,y+12,{align:'center'})}x+=w});y+=30;
+      const cw=tw/3;items.forEach(([n,v,c],i)=>{const xx=M+(i%3)*cw,yy=y+Math.floor(i/3)*24;d.setFillColor(...c);d.rect(xx,yy-7,8,8,'F');d.setFontSize(8);d.setTextColor(...MUT);d.text(T(n),xx+12,yy);d.setFont('helvetica','bold');d.setTextColor(...INK);d.text(T(fm(v)),xx+12,yy+11);d.setFont('helvetica','normal')});y+=Math.ceil(items.length/3)*24+8},
+    heat(o){const rows=o.rows.length,cols=o.cols.length,x0=M+34,cw=(W-M-x0)/cols,ch=16,mx=Math.max(...o.m.flat());this.ensure(rows*ch+40);const RP=[[229,240,238],[180,215,210],[111,176,168],[47,138,130],[15,90,85]];
+      o.m.forEach((r,ri)=>{d.setFontSize(7.5);d.setTextColor(...MUT);d.text(T(o.rows[ri]),x0-5,y+ri*ch+11,{align:'right'});r.forEach((v,ci)=>{d.setFillColor(...RP[Math.min(4,Math.floor(v/mx*5))]);d.rect(x0+ci*cw,y+ri*ch,cw-1.5,ch-1.5,'F')})});
+      o.cols.forEach((c,ci)=>{if(ci%2===0){d.setFontSize(7);d.text(T(c),x0+ci*cw+cw/2,y+rows*ch+10,{align:'center'})}});y+=rows*ch+28;
+      let x=M;d.setFontSize(7.5);d.setTextColor(...MUT);d.text('Menos',x,y);x+=28;RP.forEach(c=>{d.setFillColor(...c);d.rect(x,y-7,16,8,'F');x+=17});d.text('Más',x+3,y);y+=16},
+    hbars(items,fm,o={}){const lw=110,bw=W-2*M-lw-50,mx=o.max||Math.max(...items.map(i=>i[1]))*1.05;this.ensure(items.length*18+30);const yT=y;
+      items.forEach(([l,v,c])=>{d.setFontSize(8);d.setTextColor(...INK);d.text(T(l),M+lw-6,y+8,{align:'right'});d.setFillColor(...SUNK);d.rect(M+lw,y,bw,11,'F');d.setFillColor(...(c||TEAL));d.rect(M+lw,y,bw*v/mx,11,'F');d.text(T(fm(v)),M+lw+bw*v/mx+4,y+8);y+=18});
+      if(o.ref!=null){const xx=M+lw+bw*o.ref/mx;d.setDrawColor(...INK);d.setLineDashPattern([3,3],0);d.setLineWidth(.8);d.line(xx,yT-4,xx,y);d.setLineDashPattern([],0);d.setFontSize(7.5);d.text(T(o.refLab||''),xx,y+9,{align:'center'});y+=14}y+=8},
     gap(n=8){y+=n},
     page(){d.addPage();head()},
     async save(name){const n=d.getNumberOfPages();for(let i=1;i<=n;i++){d.setPage(i);d.setFont('helvetica','normal');d.setFontSize(7.5);d.setTextColor(...MUT);d.text(T('Datos simulados para demostración · Servicio Integral BETA · Propuesta Torre de Control · 6 nov 2026'),M,H-24);d.text(i+' / '+n,W-M,H-24,{align:'right'})}
@@ -993,13 +1024,15 @@ function fichaData(i){const o=KPIS[i],tol=.03,f=v=>o.fm(v);
   return{o,rows:[['Perspectiva',PERS[o.p]],['Definición',o.f],['Unidad y sentido',(o.hi?'Mayor es mejor':'Menor es mejor')],['Meta',o.mt],['Semáforo','Verde '+verde+' · Amarillo '+amar+' · Rojo '+rojo],['Frecuencia de cálculo',o.fr+' (motor de KPIs cada 15 min, cierre diario 23:59)'],['Dueño',o.ow],['Fuente de datos','Módulos '+KSRC[i]],['Desglose disponible','Estado y plaza · segmento de aliado · tipo de vehículo · operador · día y hora'],['Decisión si incumple',KDEC[i]],['Valor actual (ejemplo)',o.fm(o.v)+' · '+LBL[o.st]]]}}
 function showFicha(i){const {o,rows}=fichaData(i);
   openModal(`<p class="eyebrow">Ficha técnica · KPI ${String(i+1).padStart(2,'0')}</p><h2 style="font-size:28px">${o.n}</h2><div class="vrow" style="display:flex;gap:12px;align-items:center;margin:10px 0">${chip(o.st)}<span style="font-family:var(--mono);font-size:13px">Actual ${o.fm(o.v)} · meta ${o.mt}</span></div><div class="fspark">${sparkKPI(o)}</div><table class="ftab"><tbody>${rows.map(r=>`<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</tbody></table><div class="mbtns"><button type="button" class="btn pri" data-pdfk="${i}">Descargar ficha en PDF</button></div>`)}
+function kLine(o,h){const v=[...o.series,o.t],lo=Math.min(...v),hi=Math.max(...v),pd=(hi-lo)*.3||Math.abs(hi)*.05||1;return{h:h||120,labels:o.series.map((_,j)=>j===11?'Actual':'S'+(j-11)),series:[{n:o.n,c:stC(o.st),v:o.series}],target:o.t,targetLab:'meta '+o.fm(o.t),lo:lo-pd,hi:hi+pd,fm:o.fm}}
 async function fichaPDF(i){const {o,rows}=fichaData(i);const P=makePDF('Ficha técnica de indicador',`KPI ${String(i+1).padStart(2,'0')} · ${PERS[o.p]}`);if(!P)return;
   P.p(o.n,16);P.kv([['Valor actual',o.fm(o.v),o.st],['Meta',o.mt],['Estado',LBL[o.st],o.st]]);
-  P.h2('Tendencia 12 semanas');P.bars(o.series.map((v,j)=>['Semana '+(j===11?'actual':j-11),v]),o.fm,Math.max(...o.series,o.t)*1.02);
+  P.h2('Tendencia 12 semanas');P.line(kLine(o));
   P.h2('Especificación');P.table(['Campo','Detalle'],rows,[1,3]);await P.save(`Ficha-KPI-${String(i+1).padStart(2,'0')}-BETA.pdf`)}
 async function catalogPDF(){const P=makePDF('Catálogo de fichas técnicas','28 indicadores en seis perspectivas · valores de ejemplo');if(!P)return;
+  P.h2('Estado por perspectiva');const PK=Object.keys(PERS);P.cols({h:110,labels:PK.map(k=>PERS[k]),stacks:['good','warn','crit'].map(st=>({n:LBL[st],c:stC(st),v:PK.map(k=>KPIS.filter(o=>o.p===k&&o.st===st).length)})),fm:v=>fmt(v,0),legend:['good','warn','crit'].map(st=>[LBL[st],stC(st)])});
   P.h2('Resumen');P.table(['#','Indicador','Perspectiva','Actual','Meta','Estado'],KPIS.map((o,i)=>[i+1,o.n,PERS[o.p],o.fm(o.v),o.mt,LBL[o.st]]),[.4,3,1.3,1.1,1.5,1]);
-  KPIS.forEach((o,i)=>{const {rows}=fichaData(i);P.page();P.h2(`KPI ${String(i+1).padStart(2,'0')} · ${o.n}`);P.kv([['Valor actual',o.fm(o.v),o.st],['Meta',o.mt],['Estado',LBL[o.st],o.st]]);P.table(['Campo','Detalle'],rows,[1,3])});
+  KPIS.forEach((o,i)=>{const {rows}=fichaData(i);P.page();P.h2(`KPI ${String(i+1).padStart(2,'0')} · ${o.n}`);P.kv([['Valor actual',o.fm(o.v),o.st],['Meta',o.mt],['Estado',LBL[o.st],o.st]]);P.chartTitle('Tendencia 12 semanas');P.line(kLine(o,90));P.table(['Campo','Detalle'],rows,[1,3])});
   await P.save('Catalogo-fichas-KPI-BETA.pdf')}
 $('#kGrid').addEventListener('click',e=>{const b=e.target.closest('[data-ficha]');if(b)showFicha(+b.dataset.ficha);const p=e.target.closest('[data-pdfk]');if(p)fichaPDF(+p.dataset.pdfk)});
 $('#kBody').addEventListener('click',e=>{const b=e.target.closest('[data-ficha]');if(b)showFicha(+b.dataset.ficha)});
@@ -1016,10 +1049,20 @@ async function boardPDF(){
   P.h2('Indicadores principales');
   P.kv([['Entregas',fmt(Math.round(a.vol*state.per))],['Entrega perfecta',fmt(a.perf,1)+'%',status(a.perf,82.8,true)],['OTIF',fmt(a.otif,1)+'%',status(a.otif,95,true)],['Primer intento',fmt(a.fa,1)+'%',status(a.fa,90,true)],['Costo por entrega','$'+fmt(a.cpe,1),a.cpe/TARIFA>.7?'warn':''],['CSAT destinatario',fmt(a.csat,2)]]);
   P.h2('Alertas activas');[...$('#alerts').querySelectorAll('.alert')].forEach(el=>P.p('• '+el.innerText.replace(/\n/g,'  ')));
+  const pu=CH.pulse;P.h2('Pulso del día · estado de los envíos de hoy');P.stack(pu.P.map(p=>[p[0],Math.round(pu.tot*p[1]),CV[p[2]]]),v=>fmt(v));
+  P.h2('Gráficas de operación');
+  P.chartTitle('OTIF por segmento','últimos 30 días');P.line({labels:Array.from({length:30},(_,i)=>i===29?'hoy':'-'+(29-i)+'d'),series:CH.trend.map(t=>({n:t.n,c:PC[t.k],v:t.vals})),lo:88,hi:100,fm:v=>fmt(v,0)+'%',target:95,targetLab:'meta 95%',endLab:t=>t.n.split(' ')[0]+' '+fmt(t.v[29],1)+'%',legend:CH.trend.map(t=>[t.n,PC[t.k]])});
+  const hr=CH.hour;P.chartTitle('Entregas por hora','a tiempo vs fuera de ventana');P.cols({labels:hr.hrs.map(h=>h+'h'),stacks:[{n:'A tiempo',c:PC.teal,v:hr.tot.map((v,i)=>(v-hr.late[i])*hr.scale)},{n:'Fuera de ventana',c:PC.warn,v:hr.late.map(v=>v*hr.scale)}],fm:v=>fmt(v,0),legend:[['A tiempo',PC.teal],['Fuera de ventana',PC.warn]]});
+  const pa=CH.pareto,SHP={'Destinatario ausente':'Ausente','Dirección incorrecta':'Dirección','Rechazo del destinatario':'Rechazo','Negocio cerrado':'Cerrado','Zona de riesgo / acceso':'Riesgo','Reprogramado':'Reprog.','Otro':'Otro'};P.chartTitle('Motivos de no entrega','Pareto del periodo');P.cols({labels:pa.d.map(b=>SHP[b[0]]||b[0]),stacks:[{c:PC.teal,v:pa.d.map(b=>b[1])}],max:100,line:{v:pa.cum},fm:v=>fmt(v,0)+'%',legend:[['% de fallidos',PC.teal],['Acumulado',PC.ink,true]]});
+  const fc=CH.fc,fmx=niceMax(Math.max(...fc.map(d=>Math.max(d.hi,d.cap)))*1.05);P.chartTitle('Pronóstico de volumen vs capacidad','próximos 14 días');P.line({labels:fc.map(d=>d.lbl),series:[{n:'Pronóstico',c:PC.teal,v:fc.map(d=>d.m)},{n:'Capacidad',c:PC.ink,v:fc.map(d=>d.cap),dash:true,w:1.2}],band:{lo:fc.map(d=>d.lo),hi:fc.map(d=>d.hi),c:PC.tealSoft},lo:0,hi:fmx,fm:v=>fmt(v,0),legend:[['Rango probable P10-P90',PC.tealSoft],['Pronóstico',PC.teal],['Capacidad de operadores',PC.ink,true]]});P.p($('#fcIns').innerText,9);
+  const ht=CH.heat;P.chartTitle('Mapa de calor día × hora','entregas promedio');P.heat({rows:ht.dn,cols:ht.hrs.map(h=>h+'h'),m:ht.vals});
+  P.chartTitle('Costo por entrega por vehículo','MXN vs tarifa promedio');P.hbars(Object.keys(VEH).map(k=>[VEH[k].n,Math.round(VEH[k].cpe+(state.sel?ST[state.sel].cpe-47:0))]),v=>'$'+fmt(v),{max:80,ref:TARIFA,refLab:'tarifa $'+TARIFA});
+  P.chartTitle('Ocupación de unidad','% de capacidad · meta 80%');P.hbars(Object.keys(VEH).map(k=>[VEH[k].n,CH.occ[k],CH.occ[k]>=80?PC.teal:CH.occ[k]>=70?PC.warn:PC.crit]),v=>fmt(v)+'%',{max:100,ref:80,refLab:'meta 80%'});
+  const pr=CH.prod;P.chartTitle('Productividad de operadores','operadores por paradas/hora');P.cols({labels:pr.bins.map(String),stacks:[{c:PC.teal,cf:i=>pr.bins[i]<6?PC.warn:PC.teal,v:pr.cnt}],fm:v=>fmt(v,0),legend:[['En meta',PC.teal],['Bajo meta (< 6)',PC.warn]]});
   P.h2(state.sel?'Plaza seleccionada':'Desempeño por estado');
   const list=(state.sel?sc:[...rs].sort((x,y)=>y.vol-x.vol));
   P.table(['Estado','Plaza','Entregas/día','Entrega perfecta','OTIF','1er intento','Costo/entrega','Incid. por mil'],list.map(r=>[r.n,HUB[r.k],fmt(r.vol),fmt(r.perf,1)+'%',fmt(r.otif,1)+'%',fmt(r.fa,1)+'%','$'+fmt(r.cpe,1),fmt(r.inc,2)]),[1.6,1.2,1,1,.8,.9,1,.9]);
-  if(!state.sel){P.h2('Volumen diario por estado');P.bars(list.slice(0,12).map(r=>[r.n,r.vol]),v=>fmt(v))}
+  if(!state.sel){P.chartTitle('Entregas por día · top 12 estados');P.hbars(list.slice(0,12).map(r=>[r.n,r.vol]),v=>fmt(v));P.chartTitle('OTIF por estado','meta 95%');P.hbars([...list].sort((x,y)=>x.otif-y.otif).slice(0,12).map(r=>[r.n,r.otif,stC(status(r.otif,95,true))]),v=>fmt(v,1)+'%',{max:100,ref:95,refLab:'meta 95%'})}
   P.h2('Aliados · cumplimiento de SLA');P.table([...$('#clients thead').querySelectorAll('th')].map(t=>t.textContent).filter(t=>!/Tendencia/.test(t)),[...$('#clients tbody').querySelectorAll('tr')].map(tr=>[...tr.children].filter((_,i)=>i!==6).map(td=>td.innerText.trim())),[1.6,1.3,.9,.8,1,.8,1]);
   P.h2('Rutas en riesgo');const rr=[...$('#routes tbody').querySelectorAll('tr')].map(tr=>[...tr.children].map(td=>td.innerText.replace(/\n/g,' · ').trim()));P.table(['Ruta','Avance','Ventana -> ETA','Riesgo'],rr.length?rr:[['Sin rutas en riesgo','','','']],[2,1.2,1.2,.9]);
   P.h2('Pronóstico');P.p($('#fcIns').innerText);
@@ -1152,7 +1195,11 @@ async function modPDF(m){if(m!==MST.mod){MST.mod=m;modAll()}const d=MDEF[m],f=d.
   const P=makePDF('Reporte de módulo '+m,`${d.t} · ${filtTxt()}`,d.cols.length>7?'l':'p');if(!P)return;
   P.h2('Resumen del periodo');P.kv(d.metrics(R));
   const g={};R.forEach(x=>{const k=x[d.chart.by];if(k==='—')return;g[k]=(g[k]||0)+d.chart.val(x)});const it=Object.entries(g).filter(e=>e[1]>0).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  if(it.length){P.h2(d.chart.t);P.bars(it.map(([k,v])=>[(d.chart.lab||String)(k),v]),d.chart.fm||(v=>fmt(v)))}
+  P.h2('Gráficas');
+  const days=+MST.per===1?1:+MST.per,cnt=Array.from({length:Math.max(days,7)},()=>0);R.forEach(x=>{if(x.age<cnt.length)cnt[cnt.length-1-x.age]++});
+  P.chartTitle(m==='M7'?'Altas por decena':'Registros por día',m==='M7'?'más reciente a la derecha':'últimos '+cnt.length+' días');P.cols({h:100,labels:cnt.map((_,i)=>{const dd=new Date(2026,10,6-(cnt.length-1-i)*(m==='M7'?10:1));return dd.getDate()+'/'+(dd.getMonth()+1)}),stacks:[{c:PC.teal,v:cnt}],fm:v=>fmt(v,0)});
+  if(it.length){P.chartTitle(d.chart.t);P.hbars(it.map(([k,v])=>[(d.chart.lab||String)(k),v]),d.chart.fm||(v=>fmt(v)))}
+  if(R.length&&R[0].est){const ge={};R.forEach(x=>ge[x.est]=(ge[x.est]||0)+1);const top=Object.entries(ge).sort((a,b)=>b[1]-a[1]).slice(0,8);if(top.length>1){P.chartTitle('Registros por estado','top 8');P.hbars(top.map(([k,v])=>[MAP.states[k].n,v]),v=>fmt(v))}}
   P.h2(`Registros (${fmt(Math.min(R.length,300))} de ${fmt(R.length)})`);P.table(d.cols.map(c=>c[1]),R.slice(0,300).map(x=>d.cols.map(c=>cellTxt(c,x).replace(/★/g,'*'))),d.cols.map(c=>['id','f'].includes(c[0])?1.1:c[0]==='com'||c[0]==='mot'||c[0]==='ali'?1.5:1));
   P.page();P.h2('Ficha técnica del módulo');P.p(f.obj);P.table(['Atributo','Detalle'],[['Quién captura',f.who],['Frecuencia',f.freq],['Integraciones',f.integ],['Indicadores',f.kpis],['Retención',f.ret]],[1,3]);
   P.h2('Campos y validaciones');P.table(['Campo','Tipo','Regla'],f.campos,[1,1,2]);
